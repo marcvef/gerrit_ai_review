@@ -372,10 +372,75 @@ class GerritReviewer:
         print_green(f"Checking out change {change_id}...")
         print_green(f"Command: {checkout_cmd}")
 
-        # For now, just print the command without executing it
-        print_yellow("(Checkout command not executed in this version)")
+        # Verify that the Lustre directory exists
+        if not os.path.isdir(self.lustre_dir):
+            print_red(f"Lustre directory not found: {self.lustre_dir}")
+            return None
 
-        return change
+        # Save the current working directory
+        original_dir = os.getcwd()
+
+        try:
+            # Change to the Lustre git directory
+            print_green(f"Changing to Lustre directory: {self.lustre_dir}")
+            os.chdir(self.lustre_dir)
+
+            # Clean the git directory of any changes
+            print_green("Cleaning git directory...")
+
+            # Check if there are any uncommitted changes
+            status_cmd = "git status --porcelain"
+            status_result = subprocess.run(status_cmd, shell=True, capture_output=True, text=True)
+
+            if status_result.stdout.strip():
+                print_yellow("Uncommitted changes found in the repository.")
+                print_yellow("Running git reset --hard to clean the working directory...")
+
+                # Reset any uncommitted changes
+                reset_cmd = "git reset --hard"
+                reset_result = subprocess.run(reset_cmd, shell=True, capture_output=True, text=True)
+
+                if reset_result.returncode != 0:
+                    print_red(f"Error resetting git repository: {reset_result.stderr}")
+                    return None
+            else:
+                print_green("Git repository has no uncommitted changes.")
+
+            # Clean untracked files and directories
+            print_yellow("Running git clean -df to remove untracked files and directories...")
+            clean_cmd = "git clean -df"
+            clean_result = subprocess.run(clean_cmd, shell=True, capture_output=True, text=True)
+
+            if clean_result.returncode != 0:
+                print_red(f"Error cleaning git repository: {clean_result.stderr}")
+                return None
+
+            print_green("Git repository cleaned successfully.")
+
+            # Execute the checkout command
+            print_green("Executing checkout command...")
+            checkout_result = subprocess.run(checkout_cmd, shell=True, capture_output=True, text=True)
+
+            if checkout_result.returncode != 0:
+                print_red(f"Error checking out patch: {checkout_result.stderr}")
+                return None
+
+            print_green("Patch checked out successfully.")
+
+            # Verify that we're on the right commit
+            verify_cmd = "git log -1 --oneline"
+            verify_result = subprocess.run(verify_cmd, shell=True, capture_output=True, text=True)
+            print_green(f"Current commit: {verify_result.stdout.strip()}")
+
+            return change
+
+        except Exception as e:
+            print_red(f"Error during checkout: {e}")
+            return None
+
+        finally:
+            # Return to the original directory
+            os.chdir(original_dir)
 
     def run_review_bot(self, change: Dict[str, Any]) -> Optional[str]:
         """
@@ -433,7 +498,6 @@ class GerritReviewer:
             return False
 
         # Post the review comment back to Gerrit
-        return True
         return self.post_review(change, review_comment)
 
 
