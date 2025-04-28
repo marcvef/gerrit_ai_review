@@ -10,10 +10,14 @@ import argparse
 import json
 import os
 import requests
+import subprocess
 import sys
 import urllib.parse
 import yaml
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+# Import common utilities and configuration
+from review_common import ReviewBotConfig, print_green, print_yellow, print_red
 
 
 class GerritConfig:
@@ -48,19 +52,19 @@ class GerritConfig:
         try:
             # Check if the configuration file exists
             if not os.path.exists(self.config_file):
-                print(f"Configuration file not found: {self.config_file}")
-                print("Please create a configuration file.")
+                print_red(f"Configuration file not found: {self.config_file}")
+                print_red("Please create a configuration file.")
                 sys.exit(1)
 
             # Load the configuration file
             with open(self.config_file, 'r') as f:
                 config = yaml.safe_load(f)
-            print(f"Loaded Gerrit configuration from {self.config_file}")
+            print_green(f"Loaded Gerrit configuration from {self.config_file}")
 
             # Check if the configuration is empty
             if not config:
-                print(f"Configuration file is empty: {self.config_file}")
-                print("Please add the required configuration settings.")
+                print_red(f"Configuration file is empty: {self.config_file}")
+                print_red("Please add the required configuration settings.")
                 sys.exit(1)
 
             # Required configuration fields
@@ -74,8 +78,8 @@ class GerritConfig:
             # Check for missing required fields
             missing_fields = [field for field in required_fields if field not in config]
             if missing_fields:
-                print(f"Missing required configuration fields: {', '.join(missing_fields)}")
-                print("Please add these fields to your configuration file.")
+                print_red(f"Missing required configuration fields: {', '.join(missing_fields)}")
+                print_red("Please add these fields to your configuration file.")
                 sys.exit(1)
 
             # Basic settings
@@ -85,18 +89,18 @@ class GerritConfig:
 
             # Auth settings
             if 'username' not in config['auth'] or 'password' not in config['auth']:
-                print("Missing required auth fields: username, password")
-                print("Please add these fields to your configuration file.")
+                print_red("Missing required auth fields: username, password")
+                print_red("Please add these fields to your configuration file.")
                 sys.exit(1)
 
             self.username = config['auth']['username']
             self.password = config['auth']['password']
 
         except yaml.YAMLError as e:
-            print(f"Error parsing YAML in configuration file {self.config_file}: {e}")
+            print_red(f"Error parsing YAML in configuration file {self.config_file}: {e}")
             sys.exit(1)
         except Exception as e:
-            print(f"Error loading configuration from {self.config_file}: {e}")
+            print_red(f"Error loading configuration from {self.config_file}: {e}")
             sys.exit(1)
 
 
@@ -128,14 +132,14 @@ class GerritClient:
             if response.status_code == 200:
                 # Gerrit uses " )]}'" to guard against XSSI
                 version = json.loads(response.content[5:])
-                print(f"Successfully connected to Gerrit at {self.config.url}")
-                print(f"Gerrit version: {version}")
+                print_green(f"Successfully connected to Gerrit at {self.config.url}")
+                print_green(f"Gerrit version: {version}")
                 return True
             else:
-                print(f"Failed to connect to Gerrit: {response.status_code} {response.reason}")
+                print_red(f"Failed to connect to Gerrit: {response.status_code} {response.reason}")
                 return False
         except Exception as e:
-            print(f"Error connecting to Gerrit: {e}")
+            print_red(f"Error connecting to Gerrit: {e}")
             return False
 
     def get_change_by_id(self, change_id: str) -> Dict[str, Any]:
@@ -160,8 +164,8 @@ class GerritClient:
         response = requests.get(f"{self.config.url}/a{path}", auth=self.auth)
 
         if response.status_code != 200:
-            print(f"Error getting change: {response.status_code} {response.reason}")
-            print(response.text)
+            print_red(f"Error getting change: {response.status_code} {response.reason}")
+            print_red(response.text)
             return None
 
         # Gerrit uses " )]}'" to guard against XSSI
@@ -215,13 +219,13 @@ class GerritClient:
             True if the review was posted successfully, False otherwise
         """
         if not change:
-            print("Cannot post review: No change provided")
+            print_red("Cannot post review: No change provided")
             return False
 
         # Get the current revision
         current_revision = change.get('current_revision')
         if not current_revision:
-            print("Cannot post review: No current revision found")
+            print_red("Cannot post review: No current revision found")
             return False
 
         # Prepare the review input
@@ -241,14 +245,14 @@ class GerritClient:
             )
 
             if response.status_code == 200:
-                print("Review posted successfully")
+                print_green("Review posted successfully")
                 return True
             else:
-                print(f"Error posting review: {response.status_code} {response.reason}")
-                print(response.text)
+                print_red(f"Error posting review: {response.status_code} {response.reason}")
+                print_red(response.text)
                 return False
         except Exception as e:
-            print(f"Error posting review: {e}")
+            print_red(f"Error posting review: {e}")
             return False
 
 
@@ -260,6 +264,116 @@ def parse_arguments():
     parser.add_argument("--change", type=str, help="Specify a change ID or number to retrieve")
 
     return parser.parse_args()
+
+
+class GerritReviewer:
+    """
+    A class to link GerritClient and ReviewBot.
+
+    This class handles:
+    1. Checking out patches from Gerrit
+    2. Running ReviewBot on the patches
+    3. Posting review comments back to Gerrit
+    """
+
+    def __init__(self, gerrit_client: GerritClient, lustre_dir: str):
+        """
+        Initialize the GerritReviewer.
+
+        Args:
+            gerrit_client: The GerritClient to use for Gerrit operations
+            lustre_dir: The directory of the Lustre git repository
+        """
+        self.gerrit_client = gerrit_client
+        self.lustre_dir = lustre_dir
+
+    def checkout_patch(self, change_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Checkout a patch from Gerrit.
+
+        Args:
+            change_id: The ID of the change to checkout
+
+        Returns:
+            The change details if successful, None otherwise
+        """
+        # Get the change details
+        change = self.gerrit_client.get_change_by_id(change_id)
+        if not change:
+            print_red(f"Change {change_id} not found.")
+            return None
+
+        # Get the checkout command
+        checkout_cmd = self.gerrit_client.get_checkout_url(change)
+        if not checkout_cmd:
+            print_red(f"Could not get checkout command for change {change_id}.")
+            return None
+
+        print_green(f"Checking out change {change_id}...")
+        print_green(f"Command: {checkout_cmd}")
+
+        # For now, just print the command without executing it
+        print_yellow("(Checkout command not executed in this version)")
+
+        return change
+
+    def run_review_bot(self, change: Dict[str, Any]) -> Optional[str]:
+        """
+        Run ReviewBot on a checked out patch.
+
+        Args:
+            change: The change details
+
+        Returns:
+            The review comment if successful, None otherwise
+        """
+        # For now, just return a placeholder review comment
+        print_green("Running ReviewBot on the patch...")
+        print_yellow("(ReviewBot not actually run in this version)")
+
+        return "Hello from GerritReviewer! This is a placeholder review comment."
+
+    def post_review(self, change: Dict[str, Any], review_comment: str) -> bool:
+        """
+        Post a review comment back to Gerrit.
+
+        Args:
+            change: The change details
+            review_comment: The review comment to post
+
+        Returns:
+            True if successful, False otherwise
+        """
+        print_green(f"Posting review comment to change {change.get('_number')}...")
+        return self.gerrit_client.post_review(change, review_comment)
+
+    def review_patch(self, change_id: str) -> bool:
+        """
+        Review a patch from Gerrit.
+
+        This method:
+        1. Checks out the patch
+        2. Runs ReviewBot on it
+        3. Posts the review comment back to Gerrit
+
+        Args:
+            change_id: The ID of the change to review
+
+        Returns:
+            True if successful, False otherwise
+        """
+        # Checkout the patch
+        change = self.checkout_patch(change_id)
+        if not change:
+            return False
+
+        # Run ReviewBot on the patch
+        review_comment = self.run_review_bot(change)
+        if not review_comment:
+            return False
+
+        # Post the review comment back to Gerrit
+        return self.post_review(change, review_comment)
 
 
 def main():
@@ -275,58 +389,31 @@ def main():
     # Test connection if requested
     if args.test:
         if client.test_connection():
-            print("Connection test successful!")
+            print_green("Connection test successful!")
         else:
-            print("Connection test failed!")
+            print_red("Connection test failed!")
         return
 
     # Get a specific change if requested
     if args.change:
-        print(f"Getting change: {args.change}")
-        change = client.get_change_by_id(args.change)
+        print_green(f"Getting change: {args.change}")
 
-        if not change:
-            print(f"Change {args.change} not found.")
-            return
+        # Create a GerritReviewer instance
+        reviewer = GerritReviewer(client, config.lustre_dir)
 
-        # Print change details
-        print(f"Change {change['_number']}: {change.get('subject', 'No subject')}")
-        print(f"Owner: {change.get('owner', {}).get('name', 'Unknown')}")
-        print(f"Project: {change.get('project', 'Unknown')}")
-        print(f"Branch: {change.get('branch', 'Unknown')}")
-        print(f"Status: {change.get('status', 'Unknown')}")
+        # Review the patch
+        print_green(f"Reviewing patch {args.change}...")
+        success = reviewer.review_patch(args.change)
 
-        # Print current revision details
-        current_revision = change.get('current_revision')
-        if current_revision:
-            revision_info = change.get('revisions', {}).get(current_revision, {})
-            print(f"Current revision: {current_revision}")
-            print(f"Created: {revision_info.get('created', 'Unknown')}")
-
-            # Get and print the checkout URL
-            checkout_url = client.get_checkout_url(change)
-            if checkout_url:
-                print(f"\nCheckout command:")
-                print(f"  {checkout_url}")
-
-            # Print files in the revision
-            files = revision_info.get('files', {})
-            if files:
-                print("\nFiles:")
-                for file_path, file_info in files.items():
-                    status = file_info.get('status', '?')
-                    lines_inserted = file_info.get('lines_inserted', 0)
-                    lines_deleted = file_info.get('lines_deleted', 0)
-                    print(f"  {status} {file_path} (+{lines_inserted}, -{lines_deleted})")
-
-            # Post a test review comment
-            print("\nPosting a test review comment...")
-            client.post_review(change)
+        if success:
+            print_green("Review completed successfully.")
+        else:
+            print_red("Review failed.")
 
         return
 
     # If no action specified, show help
-    print("No action specified. Use --test to test the connection or --change to get a specific change.")
+    print_yellow("No action specified. Use --test to test the connection or --change to get a specific change.")
 
 
 if __name__ == "__main__":
