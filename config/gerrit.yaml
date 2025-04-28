@@ -1,0 +1,15 @@
+# Gerrit configuration
+
+# Gerrit server URL
+url: "https://review.whamcloud.com"
+
+# Project name
+project: "fs/lustre-release"
+
+# Branch name
+branch: "master"
+
+# Authentication settings
+auth:
+  username: "mvef"
+  password: "fYWCNvCHgYIOw4Vzy70/hK8R6myWIUGoif/3enkIOQ"
