@@ -19,6 +19,9 @@ from typing import Dict, Any, Optional
 # Import common utilities and configuration
 from review_common import ReviewBotConfig, print_green, print_yellow, print_red
 
+# Import the run_review function from ask_aider.py
+from ask_aider import run_review
+
 
 class GerritConfig:
     """Configuration for Gerrit connection."""
@@ -452,11 +455,46 @@ class GerritReviewer:
         Returns:
             The review comment if successful, None otherwise
         """
-        # For now, just return a placeholder review comment
         print_green("Running ReviewBot on the patch...")
-        print_yellow("(ReviewBot not actually run in this version)")
 
-        return "Hello from GerritReviewer! This is a placeholder review comment."
+        try:
+            # Get the change subject as a description
+            subject = change.get('subject', 'No subject')
+            print_green(f"Change subject: {subject}")
+
+            # Get the current revision
+            current_revision = change.get('current_revision')
+            if not current_revision:
+                print_red("Cannot get current revision from change details")
+                return None
+
+            # We have the current revision, which is enough to proceed
+
+            # Get the change number for logging
+            change_number = change.get('_number', 'unknown')
+
+            # Run the review
+            print_green(f"Running review for change {change_number}...")
+            review_result = run_review(
+                use_paid_model=True,  # Use the free model by default
+                max_files=5,           # Allow more files for Gerrit reviews
+                max_tokens=200000,     # Use the default token limit
+                output_file=None,      # Don't save to a file
+                skip_confirmation=False # Skip confirmation in automated mode
+            )
+
+            if not review_result:
+                print_red("ReviewBot did not produce a review")
+                return None
+
+            print_green("Review completed successfully")
+
+            # Return the review result
+            return review_result
+
+        except Exception as e:
+            print_red(f"Error running ReviewBot: {e}")
+            return None
 
     def post_review(self, change: Dict[str, Any], review_comment: str) -> bool:
         """

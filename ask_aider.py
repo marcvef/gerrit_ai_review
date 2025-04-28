@@ -552,7 +552,7 @@ class ReviewBot:
         # Show final token usage
         self.coder.run("/tokens")
 
-    def run(self):
+    def run_manual(self):
         """Run the complete review process."""
         # Set up the environment
         self.setup_environment()
@@ -572,11 +572,52 @@ class ReviewBot:
         # Execute the instruction and save the response
         self.execute_instruction()
 
+        return self.response
+
 
 def main():
     """Main function to run the ReviewBot."""
     bot = ReviewBot()
-    bot.run()
+    bot.run_manual()
+
+
+def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
+              instruction_file=None, output_file=None, skip_confirmation=False):
+    """
+    Run a review programmatically, without command-line arguments.
+
+    This function is designed to be imported and called from other Python modules,
+    such as gerrit_review_patch.py.
+
+    Args:
+        use_paid_model (bool): Whether to use the paid model (True) or free model (False)
+        max_files (int): Maximum number of files to add to context
+        max_tokens (int): Maximum number of tokens allowed in context
+        instruction_file (str): Path to the instruction file (if None, uses default)
+        output_file (str): Path to save the response (if None, response is not saved to a file)
+        skip_confirmation (bool): Whether to skip the confirmation prompt
+
+    Returns:
+        str: The response from the AI model
+    """
+    # Create a simple object to mimic the args namespace
+    class Args:
+        pass
+
+    args = Args()
+    args.paid_model = use_paid_model
+    args.free_model = not use_paid_model
+    args.max_files = max_files
+    args.max_tokens = max_tokens
+    args.instruction = instruction_file
+    args.output = output_file
+    args.yes = skip_confirmation
+
+    # Create a ReviewBot instance with the args
+    bot = ReviewBot(args=args)
+
+    # Run the review process
+    return bot.run_manual()
 
 
 if __name__ == "__main__":
