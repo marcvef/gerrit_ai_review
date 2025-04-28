@@ -203,6 +203,54 @@ class GerritClient:
 
         return None
 
+    def post_review(self, change: Dict[str, Any], message: str = "Hello World! This is a test comment.") -> bool:
+        """
+        Post a review comment on a change.
+
+        Args:
+            change: The change details returned by get_change_by_id
+            message: The review message to post
+
+        Returns:
+            True if the review was posted successfully, False otherwise
+        """
+        if not change:
+            print("Cannot post review: No change provided")
+            return False
+
+        # Get the current revision
+        current_revision = change.get('current_revision')
+        if not current_revision:
+            print("Cannot post review: No current revision found")
+            return False
+
+        # Prepare the review input
+        review_input = {
+            'message': message,
+            'notify': 'OWNER'
+        }
+
+        # Post the review
+        path = f"/changes/{change['id']}/revisions/{current_revision}/review"
+        try:
+            response = requests.post(
+                f"{self.config.url}/a{path}",
+                json=review_input,
+                auth=self.auth,
+                headers={'Content-Type': 'application/json'}
+            )
+
+            if response.status_code == 200:
+                print("Review posted successfully")
+                return True
+            else:
+                print(f"Error posting review: {response.status_code} {response.reason}")
+                print(response.text)
+                return False
+        except Exception as e:
+            print(f"Error posting review: {e}")
+            return False
+
 
 def parse_arguments():
     """Parse command-line arguments."""
@@ -270,6 +318,10 @@ def main():
                     lines_inserted = file_info.get('lines_inserted', 0)
                     lines_deleted = file_info.get('lines_deleted', 0)
                     print(f"  {status} {file_path} (+{lines_inserted}, -{lines_deleted})")
+
+            # Post a test review comment
+            print("\nPosting a test review comment...")
+            client.post_review(change)
 
         return
 
