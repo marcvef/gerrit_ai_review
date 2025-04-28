@@ -3,16 +3,12 @@
 # Lustre project directory
 lustre_dir: "/Users/mvef/git_wip/lustre-release"
 
-# Default output file
-default_output_file: "aider_response.txt"
-
 # Default instruction file
 default_instruction_file: "config/default_instruction.txt"
 
-# Files to add to the context
-# default_files:
-#   - "lustre/ptlrpc/nodemap_handler.c"
-#   - "lustre/ptlrpc/nodemap_storage.c"
+# Common AI references to add to the context
+common_ai_refs:
+  - "/Users/mvef/PycharmProjects/Aider_hackathon/ai_reference/lustre_arch.md"
 
 # API keys
 api_keys:

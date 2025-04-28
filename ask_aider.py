@@ -57,9 +57,8 @@ class ReviewBotConfig:
         """
         # Initialize configuration attributes
         self.lustre_dir = None
-        self.default_output_file = None
         self.default_instruction_file = None
-        self.default_files = None
+        self.common_ai_refs = None
         self.api_keys = None
         self.models = None
         self.model_metadata_file = None
@@ -97,7 +96,6 @@ class ReviewBotConfig:
             # Required configuration fields
             required_fields = [
                 'lustre_dir',
-                'default_output_file',
                 'default_instruction_file',
                 'api_keys',
                 'models',
@@ -114,13 +112,12 @@ class ReviewBotConfig:
 
             # Basic settings
             self.lustre_dir = config['lustre_dir']
-            self.default_output_file = config['default_output_file']
             self.default_instruction_file = config['default_instruction_file']
             self.model_metadata_file = config['model_metadata_file']
             self.max_tokens = config['max_tokens']
 
             # List attributes
-            self.default_files = config.get('default_files', [])
+            self.common_ai_refs = config.get('common_ai_refs', [])
 
             # Nested dictionaries
             self.api_keys = {}
@@ -180,13 +177,12 @@ class ReviewBot:
 
     def parse_arguments(self):
         """Parse command-line arguments."""
-        default_output = self.config.default_output_file
         default_instruction = self.config.default_instruction_file
 
         parser = argparse.ArgumentParser(description="Run Aider with the Lustre project")
         parser.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
         parser.add_argument("-o", "--output", type=str,
-                           help=f"Output file to write the response to (default: {default_output})")
+                           help="Output file to write the response to (if not specified, response will not be saved to a file)")
         parser.add_argument("-i", "--instruction", type=str,
                            help=f"File containing the instruction for Aider (default: {default_instruction})")
         parser.add_argument("--max-files", type=int, default=3,
@@ -256,12 +252,11 @@ class ReviewBot:
             print_yellow("Unable to initialize paid model.")
             return None
 
-    def add_files_to_context(self):
-        """Add the default files to the chat context."""
-        # The default_files attribute is guaranteed to exist in ReviewBotConfig
-        if self.config.default_files:
-            file_list = " ".join(self.config.default_files)
-            self.coder.run(f"/add {file_list}")
+    def add_ro_refs_to_context(self):
+        """Add the common AI reference to the chat context."""
+        if self.config.common_ai_refs:
+            file_list = " ".join(self.config.common_ai_refs)
+            self.coder.run(f"/read-only {file_list}")
 
     def setup_environment(self):
         """Set up the Lustre environment and create Aider objects."""
@@ -301,7 +296,7 @@ class ReviewBot:
         self.coder = Coder.create(main_model=model, fnames=[], repo=repo)
 
         # Add files to the chat context
-        self.add_files_to_context()
+        self.add_ro_refs_to_context()
 
         # Print information about the working directory
         print_green(f"Working with Lustre repository at: {self.coder.root}")
@@ -585,16 +580,16 @@ class ReviewBot:
             sys.exit(1)
 
     def save_response_to_file(self):
-        """Save the response to the specified file or a default file."""
+        """Save the response to the specified file if provided."""
         if not self.response:
             print_yellow("No response to save.")
             return
 
-        # Determine the output file path
+        # Only save if an output file is explicitly specified
         output_file = self.args.output
         if not output_file:
-            # The default_output_file attribute is guaranteed to exist in ReviewBotConfig
-            output_file = self.config.default_output_file
+            print_green("No output file specified, response will not be saved to a file.")
+            return
 
         # Write the response to the specified file
         try:
