@@ -17,6 +17,25 @@ from aider.models import Model
 from aider.run_cmd import run_cmd
 from aider.repo import GitRepo
 
+# ANSI color codes
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+RESET = "\033[0m"
+
+# Custom print functions with colored prefixes
+def print_green(message):
+    """Print a regular message with a green prefix to distinguish from Aider output."""
+    print(f"{GREEN}* [g ♥ a]{RESET} {message}")
+
+def print_yellow(message):
+    """Print a warning message with a yellow prefix to distinguish from Aider output."""
+    print(f"{YELLOW}* [g ♥ a]{RESET} {message}")
+
+def print_red(message):
+    """Print an error message with a red prefix to distinguish from Aider output."""
+    print(f"{RED}* [g ♥ a]{RESET} {message}")
+
 
 class ReviewBotConfig:
     """
@@ -72,7 +91,7 @@ class ReviewBotConfig:
         try:
             with open(self.config_file, 'r') as f:
                 config = yaml.safe_load(f)
-            print(f"Loaded configuration from {self.config_file}")
+            print_green(f"Loaded configuration from {self.config_file}")
 
             # Explicitly map YAML keys to class attributes
             if config:
@@ -100,8 +119,8 @@ class ReviewBotConfig:
                     self.model_metadata_file = config['model_metadata_file']
 
         except Exception as e:
-            print(f"Error loading configuration from {self.config_file}: {e}")
-            print("Using default configuration values")
+            print_red(f"Error loading configuration from {self.config_file}: {e}")
+            print_yellow("Using default configuration values")
 
 
 class ReviewBot:
@@ -165,12 +184,12 @@ class ReviewBot:
             if os.path.exists(metadata_file):
                 # Register the model metadata
                 register_litellm_models([metadata_file])
-                print(f"Loaded model metadata from: {metadata_file}")
+                print_green(f"Loaded model metadata from: {metadata_file}")
             else:
-                print(f"Model metadata file not found: {metadata_file}")
-                print("Token limits will use Aider's default values")
+                print_yellow(f"Model metadata file not found: {metadata_file}")
+                print_yellow("Token limits will use Aider's default values")
         except Exception as e:
-            print(f"Error loading model metadata: {e}")
+            print_red(f"Error loading model metadata: {e}")
 
     def setup_free_model(self):
         """Set up the free Gemini model."""
@@ -185,8 +204,8 @@ class ReviewBot:
             os.environ["GEMINI_API_KEY"] = api_key
             return Model(model_name)
         except (AttributeError, KeyError, ValueError) as e:
-            print(f"Warning: Missing free model configuration: {e}")
-            print("Check your config file.")
+            print_yellow(f"Warning: Missing free model configuration: {e}")
+            print_yellow("Check your config file.")
             return None
 
     def setup_paid_model(self):
@@ -202,8 +221,8 @@ class ReviewBot:
             os.environ["GEMINI_API_KEY"] = api_key
             return Model(model_name)
         except (AttributeError, KeyError, ValueError) as e:
-            print(f"Warning: Missing paid model configuration: {e}")
-            print("Unable to initialize paid model.")
+            print_yellow(f"Warning: Missing paid model configuration: {e}")
+            print_yellow("Unable to initialize paid model.")
             return None
 
     def add_files_to_context(self):
@@ -213,37 +232,37 @@ class ReviewBot:
             file_list = " ".join(self.config.default_files)
             self.coder.run(f"/add {file_list}")
         else:
-            print("Warning: No default files specified in configuration")
+            print_yellow("Warning: No default files specified in configuration")
 
     def setup_environment(self):
         """Set up the Lustre environment and create Aider objects."""
         # Verify the Lustre directory exists
         if not os.path.isdir(self.config.lustre_dir):
-            print(f"Error: Lustre directory not found at {self.config.lustre_dir}")
-            print("Please update the lustre_dir setting in your configuration file")
+            print_red(f"Error: Lustre directory not found at {self.config.lustre_dir}")
+            print_red("Please update the lustre_dir setting in your configuration file")
             sys.exit(1)
 
         # Initialize the model based on command-line arguments
         if self.args.paid_model:
-            print("Using paid model as specified by command-line argument")
+            print_green("Using paid model as specified by command-line argument")
             model = self.setup_paid_model()
         else:
             # Default to free model if not specified or if --free-model is used
-            print("Using free model" + (" as specified by command-line argument" if self.args.free_model else " (default)"))
+            print_green("Using free model" + (" as specified by command-line argument" if self.args.free_model else " (default)"))
             model = self.setup_free_model()
 
         # If the selected model failed to initialize, try the alternative
         if model is None:
             if self.args.paid_model:
-                print("Paid model initialization failed, falling back to free model")
+                print_green("Paid model initialization failed, falling back to free model")
                 model = self.setup_free_model()
             elif not self.args.free_model:  # Only try paid model if free model was the default
-                print("Free model initialization failed, trying paid model")
+                print_green("Free model initialization failed, trying paid model")
                 model = self.setup_paid_model()
 
         # If we still don't have a valid model, exit
         if model is None:
-            print("Error: Failed to initialize any model. Please check your configuration.")
+            print_red("Error: Failed to initialize any model. Please check your configuration.")
             sys.exit(1)
 
         # Create a GitRepo object pointing to the Lustre directory
@@ -256,8 +275,8 @@ class ReviewBot:
         self.add_files_to_context()
 
         # Print information about the working directory
-        print(f"Working with Lustre repository at: {self.coder.root}")
-        print(f"Files in chat context: {', '.join(self.coder.get_inchat_relative_files())}")
+        print_green(f"Working with Lustre repository at: {self.coder.root}")
+        print_green(f"Files in chat context: {', '.join(self.coder.get_inchat_relative_files())}")
 
         # Show initial token usage
         self.coder.run("/tokens")
@@ -278,12 +297,12 @@ class ReviewBot:
             tuple: (success, output) where success is a boolean indicating if the command produced output
                   and output is the command's output as a string
         """
-        print(f"Running command: {command}")
+        print_green(f"Running command: {command}")
         # Use the repository's root directory for command execution
         _, output = run_cmd(command, cwd=self.coder.root)
 
         if not output:
-            print("Command produced no output")
+            print_yellow("Command produced no output")
             return False, ""
 
         # Format the command output as a message
@@ -295,9 +314,9 @@ class ReviewBot:
                 dict(role="user", content=formatted_output),
                 dict(role="assistant", content=assistant_response),
             ]
-            print(f"Added command output to chat context ({len(output.splitlines())} lines)")
+            print_green(f"Added command output to chat context ({len(output.splitlines())} lines)")
         else:
-            print(f"Command output ({len(output.splitlines())} lines) not added to context")
+            print_green(f"Command output ({len(output.splitlines())} lines) not added to context")
 
         return True, output
 
@@ -329,20 +348,20 @@ class ReviewBot:
         try:
             with open(instruction_file, 'r') as f:
                 self.instruction = f.read()
-            print(f"Using instruction from file: {instruction_file}")
+            print_green(f"Using instruction from file: {instruction_file}")
         except Exception as e:
-            print(f"Error reading instruction file {instruction_file}: {e}")
+            print_red(f"Error reading instruction file {instruction_file}: {e}")
             if self.args.instruction:
-                print("Please provide a valid instruction file using the -i parameter.")
+                print_red("Please provide a valid instruction file using the -i parameter.")
             else:
-                print(f"The default instruction file {instruction_file} was not found.")
-                print("Please create this file or specify a different file using the -i parameter.")
+                print_red(f"The default instruction file {instruction_file} was not found.")
+                print_red("Please create this file or specify a different file using the -i parameter.")
             sys.exit(1)
 
     def save_response_to_file(self):
         """Save the response to the specified file or a default file."""
         if not self.response:
-            print("No response to save.")
+            print_yellow("No response to save.")
             return
 
         # Determine the output file path
@@ -361,11 +380,11 @@ class ReviewBot:
             # Write the response to the file
             with open(output_file, "w") as f:
                 f.write(self.response)
-            print(f"\nResponse has been written to {output_file}")
+            print_green(f"Response has been written to {output_file}")
         except IOError as e:
-            print(f"\nError writing to file {output_file}: {e}")
+            print_red(f"Error writing to file {output_file}: {e}")
         except Exception as e:
-            print(f"\nUnexpected error creating output file {output_file}: {e}")
+            print_red(f"Unexpected error creating output file {output_file}: {e}")
 
     def confirm_with_user(self):
         """
@@ -388,17 +407,17 @@ class ReviewBot:
         """Execute the instruction and save the response to a file."""
         # Show token usage and ask for confirmation
         self.coder.run("/tokens")
-        print("\nToken usage information is displayed above. Please review the cost before proceeding.")
+        print_green("Token usage information is displayed above. Please review the cost before proceeding.")
 
         # Check if we should skip confirmation
         if self.args.yes:
-            print("Skipping confirmation due to --yes flag.")
+            print_green("Skipping confirmation due to --yes flag.")
             proceed = True
         else:
             proceed = self.confirm_with_user()
 
         if not proceed:
-            print("Operation cancelled by user.")
+            print_yellow("Operation cancelled by user.")
             return
 
         # Execute the instruction
