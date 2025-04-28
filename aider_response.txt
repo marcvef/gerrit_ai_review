@@ -1,0 +1,120 @@
+Okay, I will review the commit provided.
+
+**1. Commit Summary**
+
+This commit (da3536da) addresses LU-18357 by changing how Lustre nodemap filesets are stored persistently. Previously, fileset persistence relied on the Lustre parameters llog, which was inconsistent with how other nodemap properties were handled using the nodemap Index and Attributes Manager (IAM) records on the MGS. The `lctl nodemap_set_fileset` command only applied locally and wasn't persistent, while `lctl set_param -P nodemap.<name>.fileset` used the llog.
+
+This commit modifies the system to use the nodemap IAM for persisting filesets set via `lctl nodemap_set_fileset`, making it consistent with other nodemap operations and ensuring persistence across restarts.
+
+Key changes include:
+*   **IAM Storage for Filesets:** Filesets are now stored in the nodemap IAM on the MGS. Due to the potential length of fileset paths (`PATH_MAX`) exceeding the size of a single IAM record, filesets are broken down into 28-byte path fragments. Each fragment, along with metadata (fragment ID), is stored in a 32-byte IAM record.
+*   **New Record Subtype:** These fragments are stored using the existing `NODEMAP_CLUSTER_IDX` record type but utilize a new range of subtypes (512-767). Subtype 512 is reserved for a potential future fileset header. This range allows for up to 256 fragments, sufficient for `PATH_MAX`.
+*   **Backward Compatibility:** To allow systems to upgrade without immediately breaking existing llog-based fileset configurations, a new flag `nmf_fileset_use_iam` is added to the `lu_nodemap` struct.
+    *   If this flag is false (default for existing nodemaps or those created before using the new command), the system continues to respect filesets potentially set via the llog (`lctl set_param -P`). The `nodemap_set_fileset` function called via `set_param` (`ioctl_op=false`) will only update the in-memory struct locally.
+    *   Once `lctl nodemap_set_fileset` (`ioctl_op=true`) is used for a nodemap, the `nmf_fileset_use_iam` flag is set to true in the IAM, and subsequent fileset operations for that nodemap (both `set_param` and `nodemap_set_fileset`) will interact solely with the IAM records. Llog-based settings are no longer used for that specific nodemap.
+*   **`lctl` Changes:**
+    *   `lctl nodemap_set_fileset` now writes persistently to the MGS IAM.
+    *   A deprecation warning is added to `lctl set_param` when used on `nodemap.<name>.fileset` keys, guiding users towards the `lctl nodemap_set_fileset` command.
+*   **Testing:** The `sanity-sec` test `test_27a` is updated to use longer fileset paths and verify the persistence of filesets across service restarts.
+
+This change aims to unify nodemap configuration persistence within the IAM framework.
+
+<--next-->
+
+**2. Architectural Visualization of Changes**
+
+Here's a textual visualization of where the changes primarily impact the Lustre architecture:
+
+```
++-----------------------------------------------------------------------------+
+| User Space                                                                  |
+| +-----------------+                                                         |
+| |   lctl utility  | <---[1] Modified: nodemap_set_fileset behavior,         |
+| | (lustre/utils)  |               set_param deprecation warning             |
+| +-----------------+                                                         |
++-----------------------------------------------------------------------------+
+       | (ioctl to MGS)
+       v
++-----------------------------------------------------------------------------+
+| Kernel Space (Lustre Servers)                                               |
+|                                                                             |
+| +-------------------------------------------------------------------------+ |
+| | MGS (Management Server)                                                 | |
+| | +---------------------------------------------------------------------+ | |
+| | | ptlrpc Module (lustre/ptlrpc)                                       | | |
+| | |  - nodemap_handler.c <---[2] Modified: Handle fileset set/get logic,| | |
+| | |                              ioctl_op flag, nmf_fileset_use_iam flag| | |
+| | |  - nodemap_storage.c <---[3] Modified: Add/Update/Delete/Load       | | |
+| | |                              fileset fragments in IAM, batch ops,   | | |
+| | |                              nmf_fileset_use_iam flag handling      | | |
+| | |  - nodemap_internal.h <---[4] Added: lu_nodemap_fileset_info struct | | |
+| | +---------------------------------------------------------------------+ | |
+| |                                |                                        | |
+| |                                v                                        | |
+| | +---------------------------------------------------------------------+ | |
+| | | IAM (Index & Attributes Manager / dt_object / lu_object)            | | |
+| | |  - Backend Storage Interaction <---[5] Modified: Stores/retrieves   | | |
+| | |                                    new fileset fragment records     | | |
+| | |                                    (NODEMAP_CLUSTER_IDX type,       | | |
+| | |                                     subtypes 512-767)               | | |
+| | +---------------------------------------------------------------------+ | |
+| |                                |                                        | |
+| |                                v                                        | |
+| | +---------------------------------------------------------------------+ | |
+| | | Backend Filesystem (e.g., LDiskFS/ZFS on MGS storage)               | | |
+| | +---------------------------------------------------------------------+ | |
+| +-------------------------------------------------------------------------+ |
+| | MDS/OSS (Metadata/Object Storage Servers)                             | |
+| |  - Receive updated nodemap config (incl. fileset) from MGS.           | |
+| |  - Nodemap handling code interprets the config.                       | |
+| +-------------------------------------------------------------------------+ |
++-----------------------------------------------------------------------------+
+       | (Config Sync)
+       v
++-----------------------------------------------------------------------------+
+| Kernel Space (Client Node)                                                  |
+|  - Receives nodemap info during mount/reconfiguration.                      |
+|  - Fileset info potentially used for client-side decisions (less impact).   |
++-----------------------------------------------------------------------------+
+
+**Legend:**
+*   `[1]` User-facing command changes.
+*   `[2]` Logic handling nodemap properties in memory and processing requests.
+*   `[3] ` Core logic for interacting with the persistent IAM storage for nodemaps.
+*   `[4]` Internal data structures used by nodemap storage/handler.
+*   `[5]` The persistent storage layer managed by the MGS.
+
+```
+
+<--next-->
+
+**3. Critical Review Points**
+
+This commit introduces a significant change to how a specific nodemap property (fileset) is persisted, aiming for consistency. Here are points for careful review:
+
+*   **Backward Compatibility & Transition:**
+    *   The `nmf_fileset_use_iam` flag is the core of the compatibility mechanism. Reviewers should scrutinize its handling during nodemap loading (`nodemap_cluster_rec_helper`), saving, and modification (`nodemap_set_fileset_iam`, `nodemap_idx_nodemap_update`).
+    *   **Scenario:** What happens if an admin sets a fileset via `lctl nodemap_set_fileset` (setting `nmf_fileset_use_iam=1`), then later tries to use `lctl set_param -P`? The code seems to correctly route the `set_param` call to `nodemap_set_fileset_iam` via `nodemap_set_fileset(..., ioctl_op=false)` once the flag is true, but this interaction path needs verification.
+    *   **Clarity:** The commit message states llog filesets are "compatible" but not "migrated". This implies that if a fileset was previously set via llog, it will *only* be persisted via IAM if it's explicitly re-set using `lctl nodemap_set_fileset`. Is this acceptable? Should there be a mechanism or recommendation to re-apply existing filesets using the new command after upgrading?
+    *   **Loading:** When loading the config (`nodemap_cluster_rec_helper`), the code attempts to copy the fileset from the *currently active* config if `nmf_fileset_use_iam` is false in the *loaded* record. This seems complex. Is it guaranteed that the `active_config` holds the correct llog-based value at this point? What if the MGS restarts and loads the config before the llog parameters are applied? This interaction needs careful thought.
+
+*   **IAM Fragmentation Implementation:**
+    *   **Robustness:** The fragmentation logic (splitting into 28-byte chunks) and storage across multiple IAM records (`nodemap_idx_fileset_fragments_add/del`) increases the points of failure. The undo logic in `nodemap_idx_fileset_add` (calling `_del`) and `nodemap_idx_fileset_del` (calling `_add`) is critical. Reviewers should check if these undo paths correctly handle partial successes/failures and if returning `-EIO` on *undo* failure is the best approach (it might obscure the original problem and leave the IAM in an inconsistent state). Wiping the range (`nodemap_idx_fileset_fragments_clear`) on undo failure is a drastic step.
+    *   **Atomicity:** While individual IAM operations might be atomic within a transaction (`dt_trans_*`), updating a fileset now involves multiple record deletions and insertions. Is the overall update operation effectively atomic from the user's perspective, especially across MGS failures?
+    *   **Subtype Choice:** Using a range of subtypes within `NODEMAP_CLUSTER_IDX` avoids adding a new top-level index type but makes the structure less intuitive. Was using a dedicated `NODEMAP_FILESET_IDX` type considered? The chosen range (512-767) seems arbitrary; is it documented within Lustre's internal standards for IAM usage?
+    *   **Performance:** Reading/writing potentially many records for one logical property could have performance implications, although likely minor for configuration data.
+
+*   **Code Logic:**
+    *   **`nodemap_set_fileset` Function:** This function now has complex branching based on `ioctl_op` and `nodemap->nmf_fileset_use_iam`. Ensure all combinations lead to the correct behavior (local update only vs. IAM update vs. error).
+    *   **`nodemap_process_keyrec`:** Verify that the new cases for `NODEMAP_CLUSTER_IDX` with fileset subtypes correctly call `nodemap_cluster_fileset_helper` and handle potential errors.
+    *   **Memory Management:** Ensure the allocation/freeing of `nk_array` and `nr_array` in the batch functions (`nodemap_idx_fileset_fragments_add/del/clear`) is correct in all paths, including error paths.
+
+*   **Testing (`test_27a`):**
+    *   Does the test verify the state *after* an MGS restart to confirm IAM persistence? The log shows `stopall`/`startall`, which is good.
+    *   Does it test the transition scenario? (e.g., set via llog, upgrade, check value, set via new command, restart, check value).
+    *   Does it test clearing the fileset (`--fileset clear` or `""`) using the new command and verify persistence?
+    *   The use of a very long fileset name is good for testing fragmentation.
+
+*   **Deprecation:** The warning added for `lctl set_param nodemap.*.fileset` is helpful.
+
+In summary, the core idea of unifying persistence under IAM is sound. The main review focus should be on the robustness and correctness of the fragmentation implementation (including error handling and undo logic) and the backward compatibility mechanism (`nmf_fileset_use_iam` flag and its interaction with different command paths and system states).

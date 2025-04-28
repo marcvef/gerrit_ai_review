@@ -1,0 +1,25 @@
+# ReviewBot configuration
+
+# Lustre project directory
+lustre_dir: "/Users/mvef/git_wip/lustre-release"
+
+# Default output file
+default_output_file: "aider_response.txt"
+
+# Default instruction file
+default_instruction_file: "config/default_instruction.txt"
+
+# Files to add to the context
+default_files:
+  - "lustre/ptlrpc/nodemap_handler.c"
+  - "lustre/ptlrpc/nodemap_storage.c"
+
+# API keys
+api_keys:
+  free_gemini: "AIzaSyCmFZ5jYbIKYwtdfynby_WaGD7FDouyqvc"
+  paid_gemini: "AIzaSyDwPO_2pjenfvJXLH29-1XkrWjOLanV52I"
+
+# Model settings
+models:
+  free_model: "gemini/gemini-2.5-pro-exp-03-25"
+  paid_model: "gemini/gemini-2.5-pro-preview-03-25"
