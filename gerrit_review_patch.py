@@ -256,12 +256,72 @@ class GerritClient:
             return False
 
 
+def extract_change_id_from_url(url: str) -> str:
+    """
+    Extract a change ID from a Gerrit URL.
+
+    Handles URLs like:
+    - https://review.whamcloud.com/c/fs/lustre-release/+/59005
+    - https://review.whamcloud.com/59005
+    - https://review.whamcloud.com/#/c/59005/
+    - https://review.whamcloud.com/q/59005
+
+    Args:
+        url: The Gerrit URL or change ID
+
+    Returns:
+        The extracted change ID, or the original string if it's not a URL or no change ID could be extracted
+    """
+    # If the input is not a URL, return it as is (assuming it's already a change ID)
+    if not url.startswith('http'):
+        return url
+
+    # Try to extract the change ID from the URL
+    try:
+        # Remove any trailing slashes and query parameters
+        url = url.rstrip('/')
+        if '?' in url:
+            url = url.split('?')[0]
+
+        # Split the URL into parts
+        parts = url.split('/')
+
+        # Handle URLs like https://review.whamcloud.com/59005
+        if parts[-1].isdigit():
+            return parts[-1]
+
+        # Handle URLs like https://review.whamcloud.com/c/fs/lustre-release/+/59005
+        if '+' in parts and parts[-2] == '+' and parts[-1].isdigit():
+            return parts[-1]
+
+        # Handle URLs like https://review.whamcloud.com/#/c/59005/
+        if '#' in url:
+            hash_parts = url.split('#')[1].split('/')
+            for part in hash_parts:
+                if part.isdigit():
+                    return part
+
+        # Handle URLs like https://review.whamcloud.com/q/59005
+        if '/q/' in url:
+            query_part = parts[-1]
+            if query_part.isdigit():
+                return query_part
+
+        # If we couldn't extract a change ID, return the original URL
+        print_yellow(f"Could not extract change ID from URL: {url}")
+        return url
+    except Exception as e:
+        print_red(f"Error extracting change ID from URL: {e}")
+        return url
+
+
 def parse_arguments():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Connect to Gerrit and review patches")
     parser.add_argument("--config", type=str, help="Path to configuration file")
     parser.add_argument("--test", action="store_true", help="Test the connection to Gerrit")
-    parser.add_argument("--change", type=str, help="Specify a change ID or number to retrieve")
+    parser.add_argument("change_id", type=str, nargs='?',
+                       help="Change ID, number, or Gerrit URL to retrieve and review")
 
     return parser.parse_args()
 
@@ -373,6 +433,7 @@ class GerritReviewer:
             return False
 
         # Post the review comment back to Gerrit
+        return True
         return self.post_review(change, review_comment)
 
 
@@ -398,15 +459,17 @@ def main():
         return
 
     # Get a specific change if requested
-    if args.change:
-        print_green(f"Getting change: {args.change}")
+    if args.change_id:
+        # Extract the change ID from the URL if necessary
+        change_id = extract_change_id_from_url(args.change_id)
+        print_green(f"Getting change: {change_id}")
 
         # Create a GerritReviewer instance
         reviewer = GerritReviewer(client, review_config.lustre_dir)
 
         # Review the patch
-        print_green(f"Reviewing patch {args.change}...")
-        success = reviewer.review_patch(args.change)
+        print_green(f"Reviewing patch {change_id}...")
+        success = reviewer.review_patch(change_id)
 
         if success:
             print_green("Review completed successfully.")
@@ -416,8 +479,43 @@ def main():
         return
 
     # If no action specified, show help
-    print_yellow("No action specified. Use --test to test the connection or --change to get a specific change.")
+    print_yellow("No action specified. Use --test to test the connection or provide a change ID/URL as a positional argument.")
+
+# no option for this exists atm
+def test_extract_change_id_from_url():
+    """Test the extract_change_id_from_url function with various URL formats."""
+    test_cases = [
+        # Direct change IDs
+        ("12345", "12345"),
+        ("I1234567890abcdef", "I1234567890abcdef"),
+
+        # Simple URLs
+        ("https://review.whamcloud.com/59005", "59005"),
+        ("https://review.whamcloud.com/59005/", "59005"),
+
+        # Full URLs
+        ("https://review.whamcloud.com/c/fs/lustre-release/+/59005", "59005"),
+        ("https://review.whamcloud.com/c/fs/lustre-release/+/59005/", "59005"),
+
+        # Hash URLs
+        ("https://review.whamcloud.com/#/c/59005/", "59005"),
+
+        # Query URLs
+        ("https://review.whamcloud.com/q/59005", "59005"),
+        ("https://review.whamcloud.com/q/59005?status=open", "59005"),
+    ]
+
+    for input_url, expected_output in test_cases:
+        actual_output = extract_change_id_from_url(input_url)
+        if actual_output != expected_output:
+            print_red(f"Test failed for input '{input_url}':")
+            print_red(f"  Expected: '{expected_output}'")
+            print_red(f"  Actual:   '{actual_output}'")
+        else:
+            print_green(f"Test passed for input '{input_url}'")
 
 
 if __name__ == "__main__":
+    # Uncomment to run tests
+    # test_extract_change_id_from_url()
     main()
