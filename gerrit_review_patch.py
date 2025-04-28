@@ -380,11 +380,14 @@ def main():
     """Main function."""
     args = parse_arguments()
 
-    # Load configuration
-    config = GerritConfig(args.config)
+    # Load Gerrit configuration
+    gerrit_config = GerritConfig(args.config)
+
+    # Load ReviewBot configuration
+    review_config = ReviewBotConfig()
 
     # Create Gerrit client
-    client = GerritClient(config)
+    client = GerritClient(gerrit_config)
 
     # Test connection if requested
     if args.test:
@@ -399,7 +402,7 @@ def main():
         print_green(f"Getting change: {args.change}")
 
         # Create a GerritReviewer instance
-        reviewer = GerritReviewer(client, config.lustre_dir)
+        reviewer = GerritReviewer(client, review_config.lustre_dir)
 
         # Review the patch
         print_green(f"Reviewing patch {args.change}...")
