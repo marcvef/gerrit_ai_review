@@ -55,6 +55,9 @@ class ReviewBotConfig:
             "paid_model": "gemini/gemini-2.5-pro-preview-03-25"
         }
 
+        # Model metadata file path
+        self.model_metadata_file = "config/model-metadata.json"
+
         # Set the config file path
         self.config_file = config_file if config_file else self.DEFAULT_CONFIG_FILE
 
@@ -92,6 +95,10 @@ class ReviewBotConfig:
                     for key, value in config['models'].items():
                         self.models[key] = value
 
+                # Model metadata file path
+                if 'model_metadata_file' in config:
+                    self.model_metadata_file = config['model_metadata_file']
+
         except Exception as e:
             print(f"Error loading configuration from {self.config_file}: {e}")
             print("Using default configuration values")
@@ -122,6 +129,9 @@ class ReviewBot:
         self.instruction = None
         self.response = None
 
+        # Register model metadata
+        self.register_model_metadata()
+
     def parse_arguments(self):
         """Parse command-line arguments."""
         default_output = self.config.default_output_file
@@ -142,6 +152,25 @@ class ReviewBot:
                                 help="Use the paid model")
 
         return parser.parse_args()
+
+    def register_model_metadata(self):
+        """Register model metadata from a file to set token limits."""
+        from aider.models import register_litellm_models
+
+        # Get the metadata file path from configuration
+        metadata_file = self.config.model_metadata_file
+
+        try:
+            # Check if the file exists
+            if os.path.exists(metadata_file):
+                # Register the model metadata
+                register_litellm_models([metadata_file])
+                print(f"Loaded model metadata from: {metadata_file}")
+            else:
+                print(f"Model metadata file not found: {metadata_file}")
+                print("Token limits will use Aider's default values")
+        except Exception as e:
+            print(f"Error loading model metadata: {e}")
 
     def setup_free_model(self):
         """Set up the free Gemini model."""
