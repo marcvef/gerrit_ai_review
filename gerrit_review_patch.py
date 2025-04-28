@@ -167,6 +167,42 @@ class GerritClient:
         # Gerrit uses " )]}'" to guard against XSSI
         return json.loads(response.content[5:])
 
+    def get_checkout_url(self, change: Dict[str, Any]) -> str:
+        """
+        Get the URL to checkout a specific change.
+
+        Args:
+            change: The change details returned by get_change_by_id
+
+        Returns:
+            The URL to checkout the change
+        """
+        if not change:
+            return None
+
+        # Get the current revision
+        current_revision = change.get('current_revision')
+        if not current_revision:
+            return None
+
+        # Get the fetch information for the current revision
+        fetch_info = change.get('revisions', {}).get(current_revision, {}).get('fetch', {})
+
+        # Try to get the anonymous HTTP URL first, then try other protocols
+        for protocol in ['anonymous http', 'http', 'ssh']:
+            if protocol in fetch_info:
+                url = fetch_info[protocol].get('url')
+                ref = fetch_info[protocol].get('ref')
+                if url and ref:
+                    return f"git fetch {url} {ref} && git checkout FETCH_HEAD"
+
+        # If we couldn't find a fetch URL, construct a URL based on the change number
+        change_number = change.get('_number')
+        if change_number:
+            return f"git fetch {self.config.url}/a/{self.config.project} refs/changes/{change_number%100:02d}/{change_number}/{current_revision[-8:]} && git checkout FETCH_HEAD"
+
+        return None
+
 
 def parse_arguments():
     """Parse command-line arguments."""
@@ -218,6 +254,12 @@ def main():
             revision_info = change.get('revisions', {}).get(current_revision, {})
             print(f"Current revision: {current_revision}")
             print(f"Created: {revision_info.get('created', 'Unknown')}")
+
+            # Get and print the checkout URL
+            checkout_url = client.get_checkout_url(change)
+            if checkout_url:
+                print(f"\nCheckout command:")
+                print(f"  {checkout_url}")
 
             # Print files in the revision
             files = revision_info.get('files', {})
