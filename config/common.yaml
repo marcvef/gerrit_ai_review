@@ -10,9 +10,9 @@ default_output_file: "aider_response.txt"
 default_instruction_file: "config/default_instruction.txt"
 
 # Files to add to the context
-default_files:
-  - "lustre/ptlrpc/nodemap_handler.c"
-  - "lustre/ptlrpc/nodemap_storage.c"
+# default_files:
+#   - "lustre/ptlrpc/nodemap_handler.c"
+#   - "lustre/ptlrpc/nodemap_storage.c"
 
 # API keys
 api_keys:
@@ -26,3 +26,6 @@ models:
 
 # Model metadata file path
 model_metadata_file: "config/model-metadata.json"
+
+# Token limits
+max_tokens: 200000

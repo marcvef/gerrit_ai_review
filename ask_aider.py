@@ -12,6 +12,8 @@ import sys
 import argparse
 import pathlib
 import yaml
+import io
+import re
 from aider.coders import Coder
 from aider.models import Model
 from aider.run_cmd import run_cmd
@@ -53,29 +55,15 @@ class ReviewBotConfig:
         Args:
             config_file: Path to configuration file (if None, uses default)
         """
-        # Default values for all configuration parameters
-        self.lustre_dir = "/Users/mvef/git_wip/lustre-release"
-        self.default_output_file = "aider_response.txt"
-        self.default_instruction_file = "config/default_instruction.txt"
-        self.default_files = [
-            "lustre/ptlrpc/nodemap_handler.c",
-            "lustre/ptlrpc/nodemap_storage.c"
-        ]
-
-        # API keys with nested structure
-        self.api_keys = {
-            "free_gemini": "AIzaSyCmFZ5jYbIKYwtdfynby_WaGD7FDouyqvc",
-            "paid_gemini": "AIzaSyDwPO_2pjenfvJXLH29-1XkrWjOLanV52I"
-        }
-
-        # Model settings with nested structure
-        self.models = {
-            "free_model": "gemini/gemini-2.5-pro-exp-03-25",
-            "paid_model": "gemini/gemini-2.5-pro-preview-03-25"
-        }
-
-        # Model metadata file path
-        self.model_metadata_file = "config/model-metadata.json"
+        # Initialize configuration attributes
+        self.lustre_dir = None
+        self.default_output_file = None
+        self.default_instruction_file = None
+        self.default_files = None
+        self.api_keys = None
+        self.models = None
+        self.model_metadata_file = None
+        self.max_tokens = None
 
         # Set the config file path
         self.config_file = config_file if config_file else self.DEFAULT_CONFIG_FILE
@@ -89,38 +77,77 @@ class ReviewBotConfig:
         This provides a clear mapping between YAML keys and class members.
         """
         try:
+            # Check if the configuration file exists
+            if not os.path.exists(self.config_file):
+                print_red(f"Configuration file not found: {self.config_file}")
+                print_red("Please create a configuration file.")
+                sys.exit(1)
+
+            # Load the configuration file
             with open(self.config_file, 'r') as f:
                 config = yaml.safe_load(f)
             print_green(f"Loaded configuration from {self.config_file}")
 
-            # Explicitly map YAML keys to class attributes
-            if config:
-                # Basic settings
-                if 'lustre_dir' in config:
-                    self.lustre_dir = config['lustre_dir']
-                if 'default_output_file' in config:
-                    self.default_output_file = config['default_output_file']
-                if 'default_instruction_file' in config:
-                    self.default_instruction_file = config['default_instruction_file']
-                if 'default_files' in config:
-                    self.default_files = config['default_files']
+            # Check if the configuration is empty
+            if not config:
+                print_red(f"Configuration file is empty: {self.config_file}")
+                print_red("Please add the required configuration settings.")
+                sys.exit(1)
 
-                # Nested settings
-                if 'api_keys' in config:
-                    for key, value in config['api_keys'].items():
-                        self.api_keys[key] = value
+            # Required configuration fields
+            required_fields = [
+                'lustre_dir',
+                'default_output_file',
+                'default_instruction_file',
+                'api_keys',
+                'models',
+                'model_metadata_file',
+                'max_tokens'
+            ]
 
-                if 'models' in config:
-                    for key, value in config['models'].items():
-                        self.models[key] = value
+            # Check for missing required fields
+            missing_fields = [field for field in required_fields if field not in config]
+            if missing_fields:
+                print_red(f"Missing required configuration fields: {', '.join(missing_fields)}")
+                print_red("Please add these fields to your configuration file.")
+                sys.exit(1)
 
-                # Model metadata file path
-                if 'model_metadata_file' in config:
-                    self.model_metadata_file = config['model_metadata_file']
+            # Basic settings
+            self.lustre_dir = config['lustre_dir']
+            self.default_output_file = config['default_output_file']
+            self.default_instruction_file = config['default_instruction_file']
+            self.model_metadata_file = config['model_metadata_file']
+            self.max_tokens = config['max_tokens']
 
+            # List attributes
+            self.default_files = config.get('default_files', [])
+
+            # Nested dictionaries
+            self.api_keys = {}
+            for key, value in config['api_keys'].items():
+                self.api_keys[key] = value
+
+            self.models = {}
+            for key, value in config['models'].items():
+                self.models[key] = value
+
+            # Check for required nested fields
+            if 'free_gemini' not in self.api_keys or 'paid_gemini' not in self.api_keys:
+                print_red("Missing required API keys in configuration: free_gemini, paid_gemini")
+                print_red("Please add these keys to your configuration file.")
+                sys.exit(1)
+
+            if 'free_model' not in self.models or 'paid_model' not in self.models:
+                print_red("Missing required model settings in configuration: free_model, paid_model")
+                print_red("Please add these settings to your configuration file.")
+                sys.exit(1)
+
+        except yaml.YAMLError as e:
+            print_red(f"Error parsing YAML in configuration file {self.config_file}: {e}")
+            sys.exit(1)
         except Exception as e:
             print_red(f"Error loading configuration from {self.config_file}: {e}")
-            print_yellow("Using default configuration values")
+            sys.exit(1)
 
 
 class ReviewBot:
@@ -162,6 +189,10 @@ class ReviewBot:
                            help=f"Output file to write the response to (default: {default_output})")
         parser.add_argument("-i", "--instruction", type=str,
                            help=f"File containing the instruction for Aider (default: {default_instruction})")
+        parser.add_argument("--max-files", type=int, default=3,
+                           help="Maximum number of most-changed files to add to context (default: 3)")
+        parser.add_argument("--max-tokens", type=int, default=self.config.max_tokens,
+                           help=f"Maximum number of tokens allowed in context (default: {self.config.max_tokens:,})")
 
         # Add model selection arguments in a mutually exclusive group
         model_group = parser.add_mutually_exclusive_group()
@@ -231,8 +262,6 @@ class ReviewBot:
         if self.config.default_files:
             file_list = " ".join(self.config.default_files)
             self.coder.run(f"/add {file_list}")
-        else:
-            print_yellow("Warning: No default files specified in configuration")
 
     def setup_environment(self):
         """Set up the Lustre environment and create Aider objects."""
@@ -280,7 +309,6 @@ class ReviewBot:
 
         # Show initial token usage
         self.coder.run("/tokens")
-
 
 
     def add_command_output_to_context(self, command, add_to_context=True,
@@ -335,6 +363,204 @@ class ReviewBot:
             assistant_response="I'll analyze this commit in my response."
         )
         return success
+
+    def check_and_manage_token_usage(self, max_tokens=200000, added_files=None):
+        """
+        Check the current token usage and remove files if it exceeds the threshold.
+
+        Args:
+            max_tokens (int): Maximum number of tokens allowed
+            added_files (list): List of tuples (filename, changes) for files that were added
+
+        Returns:
+            bool: True if token usage is within limits, False if files were removed
+        """
+        if not added_files:
+            return True
+
+        # Get the current token usage
+        print_green("Checking token usage...")
+
+        # Get the current token count from the model
+        token_count = self.get_current_token_count()
+
+        if token_count is None:
+            print_yellow("Could not determine token usage, keeping all files")
+            return True
+
+        print_green(f"Current token usage: {token_count:,} tokens")
+
+        # If token usage exceeds the threshold, remove files with the least changes
+        if token_count > max_tokens:
+            print_yellow(f"Token usage exceeds threshold of {max_tokens:,} tokens")
+
+            # Sort added files by changes (ascending)
+            sorted_files = sorted(added_files, key=lambda x: x[1])
+
+            # Remove files until we're under the threshold or no more files to remove
+            files_removed = []
+            for filename, changes in sorted_files:
+                # Remove the file from context
+                try:
+                    print_yellow(f"Removing {filename} ({changes} changes) to reduce token usage")
+                    self.coder.run(f"/drop {filename}")
+                    files_removed.append((filename, changes))
+
+                    # Check token usage again
+                    new_token_count = self.get_current_token_count()
+                    if new_token_count is None or new_token_count <= max_tokens:
+                        break
+                except Exception as e:
+                    print_yellow(f"Could not remove {filename} from context: {e}")
+
+            if files_removed:
+                print_yellow(f"Removed {len(files_removed)} files to reduce token usage")
+                new_token_count = self.get_current_token_count()
+                if new_token_count is not None:
+                    print_green(f"New token usage: {new_token_count:,} tokens")
+                return False
+            else:
+                print_yellow("Could not remove any files to reduce token usage")
+                return False
+
+        return True
+
+    def get_current_token_count(self):
+        """
+        Get the current token count from the model.
+
+        Returns:
+            int: Current token count, or None if it couldn't be determined
+        """
+        try:
+            # Capture the output of the /tokens command
+            original_stdout = sys.stdout
+            token_output = io.StringIO()
+            sys.stdout = token_output
+
+            # Run the /tokens command
+            self.coder.run("/tokens")
+
+            # Restore stdout
+            sys.stdout = original_stdout
+
+            # Get the output
+            output = token_output.getvalue()
+
+            # Parse the output to extract the token count
+            # Look for patterns like "$ 0.0000  150,111 tokens total"
+            match = re.search(r'\$\s+[\d\.]+\s+([\d,]+)\s+tokens total', output)
+            if match:
+                # Remove commas and convert to int
+                token_count = int(match.group(1).replace(',', ''))
+                return token_count
+
+            # Alternative pattern: look for the last line with a token count
+            lines = output.strip().split('\n')
+            for line in reversed(lines):
+                # Look for lines with token counts like "$ 0.0000   75,162 lustre/tests/sanity-sec.sh"
+                match = re.search(r'\$\s+[\d\.]+\s+([\d,]+)', line)
+                if match:
+                    # Remove commas and convert to int
+                    token_count = int(match.group(1).replace(',', ''))
+                    return token_count
+
+            # Try to extract from the context window information
+            # Look for pattern like "49,889 tokens remaining in context window" and "200,000 tokens max context window size"
+            remaining_match = re.search(r'([\d,]+)\s+tokens remaining in context window', output)
+            max_match = re.search(r'([\d,]+)\s+tokens max context window size', output)
+
+            if remaining_match and max_match:
+                remaining_tokens = int(remaining_match.group(1).replace(',', ''))
+                max_tokens = int(max_match.group(1).replace(',', ''))
+                token_count = max_tokens - remaining_tokens
+                return token_count
+
+            return None
+        except Exception as e:
+            print_yellow(f"Error getting token count: {e}")
+            return None
+
+    def add_most_changed_files_to_context(self, commit_hash="HEAD", max_files=3):
+        """
+        Add the files with the most changes from a specific commit to the chat context.
+
+        Args:
+            commit_hash (str): The commit hash to analyze, defaults to HEAD
+            max_files (int): Maximum number of files to add to context
+
+        Returns:
+            list: List of tuples (filename, changes) for files that were added
+        """
+        print_green(f"Finding the {max_files} most changed files in commit {commit_hash}...")
+
+        # Get the list of files changed in the commit with their stats
+        cmd = f"git --no-pager diff --numstat {commit_hash}^ {commit_hash}"
+        _, output = run_cmd(cmd, cwd=self.coder.root)
+
+        if not output:
+            print_yellow(f"No changes found in commit {commit_hash}")
+            return False
+
+        # Parse the output to get files and their change counts
+        # Format: <additions>\t<deletions>\t<filename>
+        file_changes = []
+        for line in output.strip().split('\n'):
+            if not line.strip():
+                continue
+
+            parts = line.split('\t')
+            if len(parts) < 3:
+                continue
+
+            try:
+                additions = int(parts[0]) if parts[0] != '-' else 0
+                deletions = int(parts[1]) if parts[1] != '-' else 0
+                filename = parts[2]
+
+                # Skip binary files (marked with - for additions/deletions)
+                if additions == 0 and deletions == 0:
+                    continue
+
+                total_changes = additions + deletions
+                file_changes.append((filename, total_changes))
+            except ValueError:
+                continue
+
+        # Sort files by number of changes (descending)
+        file_changes.sort(key=lambda x: x[1], reverse=True)
+
+        # Take the top N files
+        top_files = file_changes[:max_files]
+
+        if not top_files:
+            print_yellow("No text files with changes found in the commit")
+            return False
+
+        # Add the files to the context
+        added_files = []
+        for filename, changes in top_files:
+            # Try to add the file directly without checking if it exists
+            # Aider's /add command will handle the path resolution
+            try:
+                print_green(f"Attempting to add {filename} to context...")
+
+                # Use the file path as reported by git
+                self.coder.run(f"/add {filename}")
+                added_files.append((filename, changes))
+
+            except Exception as e:
+                    print_yellow(f"Could not add {filename} to context: {e}")
+
+        # Report what was added
+        if added_files:
+            print_green("Added the following files to context:")
+            for filename, changes in added_files:
+                print_green(f"  - {filename} ({changes} changes)")
+            return added_files
+        else:
+            print_yellow("Could not add any of the changed files to context")
+            return []
 
     def read_instruction(self):
         """Read the instruction from the specified file or the default template."""
@@ -436,6 +662,12 @@ class ReviewBot:
 
         # Add git show output to context
         self.add_git_show_to_context()
+
+        # Add the most changed files to context
+        added_files = self.add_most_changed_files_to_context(max_files=self.args.max_files)
+
+        # Check token usage and remove files if it exceeds the threshold
+        self.check_and_manage_token_usage(self.args.max_tokens, added_files)
 
         # Read the instruction from file
         self.read_instruction()
