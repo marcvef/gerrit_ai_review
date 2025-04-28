@@ -63,6 +63,7 @@ class ReviewBotConfig:
         self.models = None
         self.model_metadata_file = None
         self.max_tokens = None
+        self.ignored_dirs = None
 
         # Set the config file path
         self.config_file = config_file if config_file else self.DEFAULT_CONFIG_FILE
@@ -118,6 +119,7 @@ class ReviewBotConfig:
 
             # List attributes
             self.common_ai_refs = config.get('common_ai_refs', [])
+            self.ignored_dirs = config.get('ignored_dirs', [])
 
             # Nested dictionaries
             self.api_keys = {}
@@ -476,6 +478,27 @@ class ReviewBot:
             print_yellow(f"Error getting token count: {e}")
             return None
 
+    def is_in_ignored_dir(self, filepath):
+        """
+        Check if a file is in an ignored directory.
+
+        Args:
+            filepath (str): Path to the file
+
+        Returns:
+            bool: True if the file is in an ignored directory, False otherwise
+        """
+        # If there are no ignored directories, return False
+        if not self.config.ignored_dirs:
+            return False
+
+        # Check if the file path starts with any of the ignored directories
+        for ignored_dir in self.config.ignored_dirs:
+            if filepath.startswith(ignored_dir):
+                return True
+
+        return False
+
     def add_most_changed_files_to_context(self, commit_hash="HEAD", max_files=3):
         """
         Add the files with the most changes from a specific commit to the chat context.
@@ -518,6 +541,12 @@ class ReviewBot:
                     continue
 
                 total_changes = additions + deletions
+
+                # Check if the file is in an ignored directory
+                if self.is_in_ignored_dir(filename):
+                    print_yellow(f"Skipping {filename} (in ignored directory)")
+                    continue
+
                 file_changes.append((filename, total_changes))
             except ValueError:
                 continue
