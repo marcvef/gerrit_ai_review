@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional
 from gerrit_ai_review.utils.review_common import ReviewConfig, print_green, print_yellow, print_red
 
 # Import Gerrit client
-from gerrit_ai_review.gerrit.client import GerritClient, extract_change_id_from_url
+from gerrit_ai_review.gerrit.client import GerritClient
 
 # Import the run_review function from ask_aider.py
 from gerrit_ai_review.review_bot.ask_aider import run_review
@@ -32,11 +32,11 @@ def parse_arguments():
 
 class GerritReviewer:
     """
-    A class to link GerritClient and ReviewBot.
+    A class to link GerritClient and AiderReview.
 
     This class handles:
     1. Checking out patches from Gerrit
-    2. Running ReviewBot on the patches
+    2. Running AiderReview on the patches
     3. Posting review comments back to Gerrit
     """
 
@@ -148,7 +148,7 @@ class GerritReviewer:
 
     def run_review_bot(self, change: Dict[str, Any]) -> Optional[str]:
         """
-        Run ReviewBot on a checked out patch.
+        Run AiderReview on a checked out patch.
 
         Args:
             change: The change details
@@ -156,7 +156,7 @@ class GerritReviewer:
         Returns:
             The review comment if successful, None otherwise
         """
-        print_green("Running ReviewBot on the patch...")
+        print_green("Running AiderReview on the patch...")
 
         try:
             # Get the change subject as a description
@@ -185,7 +185,7 @@ class GerritReviewer:
             )
 
             if not review_result:
-                print_red("ReviewBot did not produce a review")
+                print_red("AiderReview did not produce a review")
                 return None
 
             print_green("Review completed successfully")
@@ -217,7 +217,7 @@ class GerritReviewer:
 
         This method:
         1. Checks out the patch
-        2. Runs ReviewBot on it
+        2. Runs AiderReview on it
         3. Posts the review comment back to Gerrit
 
         Args:
@@ -231,7 +231,7 @@ class GerritReviewer:
         if not change:
             return False
 
-        # Run ReviewBot on the patch
+        # Run AiderReview on the patch
         review_comment = self.run_review_bot(change)
         if not review_comment:
             return False
@@ -261,7 +261,7 @@ def main():
     # Get a specific change if requested
     if args.change_id:
         # Extract the change ID from the URL if necessary
-        change_id = extract_change_id_from_url(args.change_id)
+        change_id = GerritClient.extract_change_id_from_url(args.change_id)
         print_green(f"Getting change: {change_id}")
 
         # Create a GerritReviewer instance

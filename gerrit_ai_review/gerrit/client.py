@@ -165,61 +165,64 @@ class GerritClient:
             print_red(f"Error posting review: {e}")
             return False
 
+    @staticmethod
+    def extract_change_id_from_url(url: str) -> str:
+        """
+        Extract a change ID from a Gerrit URL.
 
-def extract_change_id_from_url(url: str) -> str:
-    """
-    Extract a change ID from a Gerrit URL.
+        Handles URLs like:
+        - https://review.whamcloud.com/c/fs/lustre-release/+/59005
+        - https://review.whamcloud.com/59005
+        - https://review.whamcloud.com/#/c/59005/
+        - https://review.whamcloud.com/q/59005
 
-    Handles URLs like:
-    - https://review.whamcloud.com/c/fs/lustre-release/+/59005
-    - https://review.whamcloud.com/59005
-    - https://review.whamcloud.com/#/c/59005/
-    - https://review.whamcloud.com/q/59005
+        Args:
+            url: The Gerrit URL or change ID
 
-    Args:
-        url: The Gerrit URL or change ID
+        Returns:
+            The extracted change ID, or the original string if it's not a URL or no change ID could be extracted
+        """
+        # If the input is not a URL, return it as is (assuming it's already a change ID)
+        if not url.startswith('http'):
+            return url
 
-    Returns:
-        The extracted change ID, or the original string if it's not a URL or no change ID could be extracted
-    """
-    # If the input is not a URL, return it as is (assuming it's already a change ID)
-    if not url.startswith('http'):
-        return url
+        # Try to extract the change ID from the URL
+        try:
+            # Remove any trailing slashes and query parameters
+            url = url.rstrip('/')
+            if '?' in url:
+                url = url.split('?')[0]
 
-    # Try to extract the change ID from the URL
-    try:
-        # Remove any trailing slashes and query parameters
-        url = url.rstrip('/')
-        if '?' in url:
-            url = url.split('?')[0]
+            # Split the URL into parts
+            parts = url.split('/')
 
-        # Split the URL into parts
-        parts = url.split('/')
+            # Handle URLs like https://review.whamcloud.com/59005
+            if parts[-1].isdigit():
+                return parts[-1]
 
-        # Handle URLs like https://review.whamcloud.com/59005
-        if parts[-1].isdigit():
-            return parts[-1]
+            # Handle URLs like https://review.whamcloud.com/c/fs/lustre-release/+/59005
+            if '+' in parts and parts[-2] == '+' and parts[-1].isdigit():
+                return parts[-1]
 
-        # Handle URLs like https://review.whamcloud.com/c/fs/lustre-release/+/59005
-        if '+' in parts and parts[-2] == '+' and parts[-1].isdigit():
-            return parts[-1]
+            # Handle URLs like https://review.whamcloud.com/#/c/59005/
+            if '#' in url:
+                hash_parts = url.split('#')[1].split('/')
+                for part in hash_parts:
+                    if part.isdigit():
+                        return part
 
-        # Handle URLs like https://review.whamcloud.com/#/c/59005/
-        if '#' in url:
-            hash_parts = url.split('#')[1].split('/')
-            for part in hash_parts:
-                if part.isdigit():
-                    return part
+            # Handle URLs like https://review.whamcloud.com/q/59005
+            if '/q/' in url:
+                query_part = parts[-1]
+                if query_part.isdigit():
+                    return query_part
 
-        # Handle URLs like https://review.whamcloud.com/q/59005
-        if '/q/' in url:
-            query_part = parts[-1]
-            if query_part.isdigit():
-                return query_part
+            # If we couldn't extract a change ID, return the original URL
+            print_yellow(f"Could not extract change ID from URL: {url}")
+            return url
+        except Exception as e:
+            print_red(f"Error extracting change ID from URL: {e}")
+            return url
 
-        # If we couldn't extract a change ID, return the original URL
-        print_yellow(f"Could not extract change ID from URL: {url}")
-        return url
-    except Exception as e:
-        print_red(f"Error extracting change ID from URL: {e}")
-        return url
+
+

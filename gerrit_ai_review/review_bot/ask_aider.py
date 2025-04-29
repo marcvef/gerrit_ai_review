@@ -22,7 +22,7 @@ from aider.repo import GitRepo
 # Import common utilities and configuration
 from gerrit_ai_review.utils.review_common import ReviewConfig, print_green, print_yellow, print_red
 
-class ReviewBot:
+class AiderReview:
     """
     A class that encapsulates the functionality for reviewing Lustre code commits
     using Aider and LLM models.
@@ -30,7 +30,7 @@ class ReviewBot:
 
     def __init__(self, args=None, config_file=None):
         """
-        Initialize the ReviewBot with command line arguments and configuration.
+        Initialize the AiderReview with command line arguments and configuration.
 
         Args:
             args: Command line arguments (if None, they will be parsed)
@@ -552,7 +552,7 @@ class ReviewBot:
         # Show final token usage
         self.coder.run("/tokens")
 
-    def run_manual(self):
+    def run(self):
         """Run the complete review process."""
         # Set up the environment
         self.setup_environment()
@@ -576,9 +576,9 @@ class ReviewBot:
 
 
 def main():
-    """Main function to run the ReviewBot."""
-    bot = ReviewBot()
-    bot.run_manual()
+    """Main function to run the AiderReview."""
+    bot = AiderReview()
+    bot.run()
 
 
 def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
@@ -613,11 +613,11 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
     args.output = output_file
     args.yes = skip_confirmation
 
-    # Create a ReviewBot instance with the args
-    bot = ReviewBot(args=args)
+    # Create an AiderReview instance with the args
+    bot = AiderReview(args=args)
 
     # Run the review process
-    return bot.run_manual()
+    return bot.run()
 
 
 if __name__ == "__main__":
