@@ -17,13 +17,13 @@ import yaml
 from typing import Dict, Any, Optional
 
 # Import common utilities and configuration
-from review_common import ReviewConfig, print_green, print_yellow, print_red
+from util.review_common import ReviewConfig, print_green, print_yellow, print_red
 
 # Import the run_review function from ask_aider.py
 from ask_aider import run_review
 
 
-# GerritConfig class has been removed and merged into ReviewConfig in review_common.py
+# GerritConfig class has been removed and merged into ReviewConfig in util.review_common
 
 
 class GerritClient:

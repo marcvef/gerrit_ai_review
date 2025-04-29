@@ -20,7 +20,7 @@ from aider.run_cmd import run_cmd
 from aider.repo import GitRepo
 
 # Import common utilities and configuration
-from review_common import ReviewConfig, print_green, print_yellow, print_red
+from util.review_common import ReviewConfig, print_green, print_yellow, print_red
 
 class ReviewBot:
     """

@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 # Import the function to test
 from gerrit_review_patch import extract_change_id_from_url
-from review_common import print_green, print_red
+from util.review_common import print_green, print_red
 
 
 def test_extract_change_id_from_url():
