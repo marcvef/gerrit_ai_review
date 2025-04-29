@@ -43,7 +43,19 @@ class AiderReview:
 
         # Validate required arguments
         self._validate_args(args)
-        self.args = args
+
+        # Create a copy of args to avoid modifying the original
+        import copy
+        self.args = copy.copy(args)
+
+        # Use configuration values as fallbacks for command-line arguments
+        if self.args.max_files is None:
+            self.args.max_files = self.config.aider_max_files
+            print_green(f"Using configured max_files value: {self.args.max_files}", self)
+
+        if self.args.max_tokens is None:
+            self.args.max_tokens = self.config.aider_max_tokens
+            print_green(f"Using configured max_tokens value: {self.args.max_tokens}", self)
 
         # Initialize other attributes
         self.coder = None
@@ -581,10 +593,12 @@ class AiderReview:
         self.add_git_show_to_context()
 
         # Add the most changed files to context
+        # The max_files value is already set in the constructor with fallback to config
         added_files = self.add_most_changed_files_to_context(max_files=self.args.max_files)
 
         # Check token usage and remove files if it exceeds the threshold
-        # Note: We're using the configured aider_map_tokens value for the repository map, but still respecting max_tokens for overall context
+        # Note: We're using the configured aider_map_tokens value for the repository map
+        # The max_tokens value is already set in the constructor with fallback to config
         self.check_and_manage_token_usage(self.args.max_tokens, added_files)
 
         # Read the instruction from file

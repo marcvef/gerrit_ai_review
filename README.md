@@ -58,6 +58,9 @@ aider:
   max_tokens: 200000
   map_tokens: 8192
 
+  # Maximum number of files to add to context
+  max_files: 5
+
   # Directories to ignore when adding files to context
   ignored_dirs:
     - "lustre/tests"

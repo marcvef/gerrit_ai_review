@@ -91,6 +91,7 @@ class ReviewConfig:
         self.aider_model_metadata_file = None
         self.aider_max_tokens = None
         self.aider_map_tokens = None
+        self.aider_max_files = None
         self.aider_ignored_dirs = None
 
         # Initialize Gerrit configuration attributes
@@ -170,6 +171,7 @@ class ReviewConfig:
             self.aider_model_metadata_file = aider_config['model_metadata_file']
             self.aider_max_tokens = aider_config['max_tokens']
             self.aider_map_tokens = aider_config.get('map_tokens', 1024)  # Default to 1024 if not specified
+            self.aider_max_files = aider_config.get('max_files', 3)  # Default to 3 if not specified
 
             # List attributes
             self.aider_common_ai_refs = aider_config.get('common_ai_refs', [])

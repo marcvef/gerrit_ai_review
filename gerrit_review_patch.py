@@ -180,11 +180,13 @@ class GerritReviewer:
 
             # Run the review
             print_green(f"Running review for change {change_number}...", self)
+            # The configuration file will be passed to AiderReview, which will handle
+            # loading the configuration values and using them as fallbacks for command-line arguments
             review_result = run_review(
-                use_paid_model=True,  # Use the free model by default
-                max_files=5,           # Allow more files for Gerrit reviews
-                max_tokens=200000,     # Use the default token limit
-                output_file=None,      # Don't save to a file
+                use_paid_model=True,  # Use the paid model for Gerrit reviews
+                max_files=None,       # Let AiderReview use the configured value
+                max_tokens=None,      # Let AiderReview use the configured value
+                output_file=None,     # Don't save to a file
                 skip_confirmation=False, # Skip confirmation in automated mode
                 config_file=self.config_file  # Pass the configuration file
             )
