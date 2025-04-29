@@ -23,102 +23,21 @@ from review_common import ReviewBotConfig, print_green, print_yellow, print_red
 from ask_aider import run_review
 
 
-class GerritConfig:
-    """Configuration for Gerrit connection."""
-
-    DEFAULT_CONFIG_FILE = "config/gerrit.yaml"
-
-    def __init__(self, config_file=None):
-        """
-        Initialize the Gerrit configuration.
-
-        Args:
-            config_file: Path to configuration file (if None, uses default)
-        """
-        # Initialize configuration attributes
-        self.url = None
-        self.project = None
-        self.branch = None
-        self.username = None
-        self.password = None
-
-        # Set the config file path
-        self.config_file = config_file if config_file else self.DEFAULT_CONFIG_FILE
-
-        # Load configuration from file
-        self.load_config()
-
-    def load_config(self):
-        """
-        Load configuration from YAML file.
-        """
-        try:
-            # Check if the configuration file exists
-            if not os.path.exists(self.config_file):
-                print_red(f"Configuration file not found: {self.config_file}")
-                print_red("Please create a configuration file.")
-                sys.exit(1)
-
-            # Load the configuration file
-            with open(self.config_file, 'r') as f:
-                config = yaml.safe_load(f)
-            print_green(f"Loaded Gerrit configuration from {self.config_file}")
-
-            # Check if the configuration is empty
-            if not config:
-                print_red(f"Configuration file is empty: {self.config_file}")
-                print_red("Please add the required configuration settings.")
-                sys.exit(1)
-
-            # Required configuration fields
-            required_fields = [
-                'url',
-                'project',
-                'branch',
-                'auth'
-            ]
-
-            # Check for missing required fields
-            missing_fields = [field for field in required_fields if field not in config]
-            if missing_fields:
-                print_red(f"Missing required configuration fields: {', '.join(missing_fields)}")
-                print_red("Please add these fields to your configuration file.")
-                sys.exit(1)
-
-            # Basic settings
-            self.url = config['url']
-            self.project = config['project']
-            self.branch = config['branch']
-
-            # Auth settings
-            if 'username' not in config['auth'] or 'password' not in config['auth']:
-                print_red("Missing required auth fields: username, password")
-                print_red("Please add these fields to your configuration file.")
-                sys.exit(1)
-
-            self.username = config['auth']['username']
-            self.password = config['auth']['password']
-
-        except yaml.YAMLError as e:
-            print_red(f"Error parsing YAML in configuration file {self.config_file}: {e}")
-            sys.exit(1)
-        except Exception as e:
-            print_red(f"Error loading configuration from {self.config_file}: {e}")
-            sys.exit(1)
+# GerritConfig class has been removed and merged into ReviewBotConfig in review_common.py
 
 
 class GerritClient:
     """Client for interacting with Gerrit."""
 
-    def __init__(self, config: GerritConfig):
+    def __init__(self, config: ReviewBotConfig):
         """
         Initialize the Gerrit client.
 
         Args:
-            config: Gerrit configuration
+            config: ReviewBot configuration containing Gerrit settings
         """
         self.config = config
-        self.auth = requests.auth.HTTPBasicAuth(config.username, config.password)
+        self.auth = requests.auth.HTTPBasicAuth(config.gerrit_username, config.gerrit_password)
 
     def test_connection(self) -> bool:
         """
@@ -130,12 +49,12 @@ class GerritClient:
         try:
             # Try to get the server version
             path = '/config/server/version'
-            response = requests.get(f"{self.config.url}/a{path}", auth=self.auth)
+            response = requests.get(f"{self.config.gerrit_url}/a{path}", auth=self.auth)
 
             if response.status_code == 200:
                 # Gerrit uses " )]}'" to guard against XSSI
                 version = json.loads(response.content[5:])
-                print_green(f"Successfully connected to Gerrit at {self.config.url}")
+                print_green(f"Successfully connected to Gerrit at {self.config.gerrit_url}")
                 print_green(f"Gerrit version: {version}")
                 return True
             else:
@@ -160,11 +79,11 @@ class GerritClient:
             path = f"/changes/{change_id}?o=CURRENT_REVISION&o=CURRENT_COMMIT&o=CURRENT_FILES"
         else:
             # Otherwise, assume it's a full change ID
-            path = (f"/changes/{urllib.parse.quote(self.config.project, safe='')}~" +
-                   f"{urllib.parse.quote(self.config.branch, safe='')}~{change_id}" +
+            path = (f"/changes/{urllib.parse.quote(self.config.gerrit_project, safe='')}~" +
+                   f"{urllib.parse.quote(self.config.gerrit_branch, safe='')}~{change_id}" +
                    "?o=CURRENT_REVISION&o=CURRENT_COMMIT&o=CURRENT_FILES")
 
-        response = requests.get(f"{self.config.url}/a{path}", auth=self.auth)
+        response = requests.get(f"{self.config.gerrit_url}/a{path}", auth=self.auth)
 
         if response.status_code != 200:
             print_red(f"Error getting change: {response.status_code} {response.reason}")
@@ -206,7 +125,7 @@ class GerritClient:
         # If we couldn't find a fetch URL, construct a URL based on the change number
         change_number = change.get('_number')
         if change_number:
-            return f"git fetch {self.config.url}/a/{self.config.project} refs/changes/{change_number%100:02d}/{change_number}/{current_revision[-8:]} && git checkout FETCH_HEAD"
+            return f"git fetch {self.config.gerrit_url}/a/{self.config.gerrit_project} refs/changes/{change_number%100:02d}/{change_number}/{current_revision[-8:]} && git checkout FETCH_HEAD"
 
         return None
 
@@ -241,7 +160,7 @@ class GerritClient:
         path = f"/changes/{change['id']}/revisions/{current_revision}/review"
         try:
             response = requests.post(
-                f"{self.config.url}/a{path}",
+                f"{self.config.gerrit_url}/a{path}",
                 json=review_input,
                 auth=self.auth,
                 headers={'Content-Type': 'application/json'}
@@ -543,14 +462,11 @@ def main():
     """Main function."""
     args = parse_arguments()
 
-    # Load Gerrit configuration
-    gerrit_config = GerritConfig(args.config)
-
-    # Load ReviewBot configuration
-    review_config = ReviewBotConfig()
+    # Load configuration (now contains both ReviewBot and Gerrit settings)
+    config = ReviewBotConfig(args.config)
 
     # Create Gerrit client
-    client = GerritClient(gerrit_config)
+    client = GerritClient(config)
 
     # Test connection if requested
     if args.test:
@@ -567,7 +483,7 @@ def main():
         print_green(f"Getting change: {change_id}")
 
         # Create a GerritReviewer instance
-        reviewer = GerritReviewer(client, review_config.lustre_dir)
+        reviewer = GerritReviewer(client, config.lustre_dir)
 
         # Review the patch
         print_green(f"Reviewing patch {change_id}...")

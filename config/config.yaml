@@ -1,4 +1,4 @@
-# ReviewBot configuration
+# ReviewBot and Gerrit configuration
 
 # Lustre project directory
 lustre_dir: "/Users/mvef/git_wip/lustre-release"
@@ -29,3 +29,19 @@ max_tokens: 200000
 # Directories to ignore when adding files to context
 ignored_dirs:
   - "lustre/tests"
+
+# Gerrit server settings
+gerrit:
+  # Gerrit server URL
+  url: "https://review.whamcloud.com"
+
+  # Project name
+  project: "fs/lustre-release"
+
+  # Branch name
+  branch: "master"
+
+  # Authentication settings
+  auth:
+    username: "mvef"
+    password: "fYWCNvCHgYIOw4Vzy70/hK8R6myWIUGoif/3enkIOQ"
