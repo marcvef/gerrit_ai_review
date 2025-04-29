@@ -24,6 +24,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Connect to Gerrit and review patches")
     parser.add_argument("--config", type=str, help="Path to configuration file")
     parser.add_argument("--test", action="store_true", help="Test the connection to Gerrit")
+    parser.add_argument("-s", "--skip-gerrit-review", action="store_true",
+                       help="Run AI review but skip posting the results to Gerrit")
     parser.add_argument("change_id", type=str, nargs='?',
                        help="Change ID, number, or Gerrit URL to retrieve and review")
 
@@ -211,17 +213,18 @@ class GerritReviewer:
         print_green(f"Posting review comment to change {change.get('_number')}...", self)
         return self.gerrit_client.post_review(change, review_comment)
 
-    def review_patch(self, change_id: str) -> bool:
+    def review_patch(self, change_id: str, skip_gerrit_review: bool = False) -> bool:
         """
         Review a patch from Gerrit.
 
         This method:
         1. Checks out the patch
         2. Runs AiderReview on it
-        3. Posts the review comment back to Gerrit
+        3. Posts the review comment back to Gerrit (unless skip_gerrit_review is True)
 
         Args:
             change_id: The ID of the change to review
+            skip_gerrit_review: If True, skip posting the review to Gerrit
 
         Returns:
             True if successful, False otherwise
@@ -235,6 +238,10 @@ class GerritReviewer:
         review_comment = self.run_review_bot(change)
         if not review_comment:
             return False
+
+        # If skip_gerrit_review is True, don't post the review to Gerrit
+        if skip_gerrit_review:
+            return True
 
         # Post the review comment back to Gerrit
         return self.post_review(change, review_comment)
@@ -269,10 +276,13 @@ def main():
 
         # Review the patch
         print_green(f"Reviewing patch {change_id}...")
-        success = reviewer.review_patch(change_id)
+        success = reviewer.review_patch(change_id, args.skip_gerrit_review)
 
         if success:
-            print_green("Review completed successfully.")
+            if args.skip_gerrit_review:
+                print_green("AI review completed successfully (not posted to Gerrit).")
+            else:
+                print_green("Review completed and posted to Gerrit successfully.")
         else:
             print_red("Review failed.")
 

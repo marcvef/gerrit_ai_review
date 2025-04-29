@@ -594,6 +594,3 @@ class AiderReview:
         self.execute_instruction()
 
         return self.response
-
-
-
