@@ -81,12 +81,13 @@ class GerritClient:
         # Gerrit uses " )]}'" to guard against XSSI
         return json.loads(response.content[5:])
 
-    def get_checkout_url(self, change: Dict[str, Any]) -> str:
+    def get_checkout_url(self, change: Dict[str, Any], patch_version: str = None) -> str:
         """
         Get the URL to checkout a specific change.
 
         Args:
             change: The change details returned by get_change_by_id
+            patch_version: The specific patch version to checkout (if None, uses the latest)
 
         Returns:
             The URL to checkout the change
@@ -99,6 +100,14 @@ class GerritClient:
         if not current_revision:
             return None
 
+        # If a specific patch version is requested, we need to construct the URL differently
+        change_number = change.get('_number')
+        if patch_version and change_number:
+            print_green(f"Using specific patch version: {patch_version}", self)
+            # Construct a URL for the specific patch version
+            return f"git fetch {self.config.gerrit_url}/{self.config.gerrit_project} refs/changes/{change_number%100:02d}/{change_number}/{patch_version} && git checkout FETCH_HEAD"
+
+        # Otherwise, use the standard approach for the latest version
         # Get the fetch information for the current revision
         fetch_info = change.get('revisions', {}).get(current_revision, {}).get('fetch', {})
 
@@ -111,9 +120,8 @@ class GerritClient:
                     return f"git fetch {url} {ref} && git checkout FETCH_HEAD"
 
         # If we couldn't find a fetch URL, construct a URL based on the change number
-        change_number = change.get('_number')
         if change_number:
-            return f"git fetch {self.config.gerrit_url}/a/{self.config.gerrit_project} refs/changes/{change_number%100:02d}/{change_number}/{current_revision[-8:]} && git checkout FETCH_HEAD"
+            return f"git fetch {self.config.gerrit_url}/{self.config.gerrit_project} refs/changes/{change_number%100:02d}/{change_number}/{current_revision[-8:]} && git checkout FETCH_HEAD"
 
         return None
 
@@ -166,12 +174,13 @@ class GerritClient:
             return False
 
     @staticmethod
-    def extract_change_id_from_url(url: str) -> str:
+    def extract_change_id_from_url(url: str) -> tuple:
         """
-        Extract a change ID from a Gerrit URL.
+        Extract a change ID and patch version from a Gerrit URL.
 
         Handles URLs like:
         - https://review.whamcloud.com/c/fs/lustre-release/+/59005
+        - https://review.whamcloud.com/c/fs/lustre-release/+/58460/5 (with patch version)
         - https://review.whamcloud.com/59005
         - https://review.whamcloud.com/#/c/59005/
         - https://review.whamcloud.com/q/59005
@@ -180,14 +189,22 @@ class GerritClient:
             url: The Gerrit URL or change ID
 
         Returns:
-            The extracted change ID, or the original string if it's not a URL or no change ID could be extracted
+            A tuple of (change_id, patch_version) where patch_version is None if not specified
         """
         # If the input is not a URL, return it as is (assuming it's already a change ID)
         if not url.startswith('http'):
-            return url
+            return url, None
 
-        # Try to extract the change ID from the URL
+        # Try to extract the change ID and patch version from the URL
         try:
+            # First, try to match the specific pattern for URLs with patch versions
+            # Example: https://review.whamcloud.com/c/fs/lustre-release/+/58460/5
+            import re
+            pattern = r'/\+/(\d+)/(\d+)$'
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1), match.group(2)
+
             # Remove any trailing slashes and query parameters
             url = url.rstrip('/')
             if '?' in url:
@@ -198,28 +215,34 @@ class GerritClient:
 
             # Handle URLs like https://review.whamcloud.com/59005
             if parts[-1].isdigit():
-                return parts[-1]
+                return parts[-1], None
 
             # Handle URLs like https://review.whamcloud.com/c/fs/lustre-release/+/59005
-            if '+' in parts and parts[-2] == '+' and parts[-1].isdigit():
-                return parts[-1]
+            if '+' in parts:
+                # Find the part after the '+' symbol
+                for i in range(len(parts) - 1):
+                    if parts[i] == '+' and i+1 < len(parts) and parts[i+1].isdigit():
+                        return parts[i+1], None
 
             # Handle URLs like https://review.whamcloud.com/#/c/59005/
             if '#' in url:
                 hash_parts = url.split('#')[1].split('/')
-                for part in hash_parts:
+                for i, part in enumerate(hash_parts):
                     if part.isdigit():
-                        return part
+                        # Check if there's a patch version after the change ID
+                        if i+1 < len(hash_parts) and hash_parts[i+1].isdigit():
+                            return part, hash_parts[i+1]
+                        return part, None
 
             # Handle URLs like https://review.whamcloud.com/q/59005
             if '/q/' in url:
                 query_part = parts[-1]
                 if query_part.isdigit():
-                    return query_part
+                    return query_part, None
 
             # If we couldn't extract a change ID, return the original URL
             print_yellow(f"Could not extract change ID from URL: {url}")
-            return url
+            return url, None
         except Exception as e:
             print_red(f"Error extracting change ID from URL: {e}")
-            return url
+            return url, None

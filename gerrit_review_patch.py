@@ -67,12 +67,13 @@ class GerritReviewer:
         self.lustre_dir = lustre_dir
         self.config_file = config_file
 
-    def checkout_patch(self, change_id: str) -> Optional[Dict[str, Any]]:
+    def checkout_patch(self, change_id: str, patch_version: str = None) -> Optional[Dict[str, Any]]:
         """
         Checkout a patch from Gerrit.
 
         Args:
             change_id: The ID of the change to checkout
+            patch_version: The specific patch version to checkout (if None, uses the latest)
 
         Returns:
             The change details if successful, None otherwise
@@ -83,8 +84,8 @@ class GerritReviewer:
             print_red(f"Change {change_id} not found.", self)
             return None
 
-        # Get the checkout command
-        checkout_cmd = self.gerrit_client.get_checkout_url(change)
+        # Get the checkout command, passing the patch version if specified
+        checkout_cmd = self.gerrit_client.get_checkout_url(change, patch_version)
         if not checkout_cmd:
             print_red(f"Could not get checkout command for change {change_id}.", self)
             return None
@@ -259,7 +260,8 @@ class GerritReviewer:
 
     def review_patch(self, change_id: str, skip_gerrit_review: bool = False,
                    generic_review: bool = True, style_review: bool = False,
-                   static_analysis_review: bool = False, skip_confirmation: bool = False) -> bool:
+                   static_analysis_review: bool = False, skip_confirmation: bool = False,
+                   patch_version: str = None) -> bool:
         """
         Review a patch from Gerrit.
 
@@ -275,12 +277,13 @@ class GerritReviewer:
             style_review: Whether to run the style check review
             static_analysis_review: Whether to run the static analysis review
             skip_confirmation: Whether to skip confirmation prompts
+            patch_version: The specific patch version to checkout (if None, uses the latest)
 
         Returns:
             True if successful, False otherwise
         """
-        # Checkout the patch
-        change = self.checkout_patch(change_id)
+        # Checkout the patch with the specified patch version
+        change = self.checkout_patch(change_id, patch_version)
         if not change:
             return False
 
@@ -342,9 +345,9 @@ def main():
 
     # Get a specific change if requested
     if args.change_id:
-        # Extract the change ID from the URL if necessary
-        change_id = GerritClient.extract_change_id_from_url(args.change_id)
-        print_green(f"Getting change: {change_id}")
+        # Extract the change ID and patch version from the URL if necessary
+        change_id, patch_version = GerritClient.extract_change_id_from_url(args.change_id)
+        print_green(f"Getting change: {change_id}" + (f" (patch version: {patch_version})" if patch_version else ""))
 
         # Create a GerritReviewer instance
         reviewer = GerritReviewer(client, config.lustre_dir, args.config)
@@ -357,7 +360,8 @@ def main():
             generic_review=args.generic_review,
             style_review=args.style_review,
             static_analysis_review=args.static_analysis_review,
-            skip_confirmation=args.yes
+            skip_confirmation=args.yes,
+            patch_version=patch_version
         )
 
         if success:
