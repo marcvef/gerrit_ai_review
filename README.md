@@ -16,8 +16,23 @@ A tool for AI-assisted code review of Gerrit patches.
 
 ## Installation
 
-(Disclaimer: setup.py is not functional yet. pip -e has not been tested yet. Only manual installation instructions are provided for now.)
+(Disclaimer: setup.py is not functional yet. pip -e has not been tested yet.)
 
+### Semi-automatic
+```bash
+# Clone the repository
+git clone https://github.com/marcvef/gerrit_ai_review
+cd gerrit_ai_review
+# setup Python virtual environment with Python 3.12, install dependencies, and apply patches
+./install.sh 
+
+# Edit config/config.yaml to add your API keys and customize settings
+
+# Optional: Clone your Lustre codebase
+# Important: Set the correct path to your Lustre repository in config.yaml
+# Note: The tool will clean the Lustre codebase before running reviews
+```
+### Manual
 ```bash
 # Clone the repository
 git clone https://github.com/marcvef/gerrit_ai_review
@@ -34,11 +49,11 @@ pip install -r requirements.txt
 ./patch_aider_api.sh
 
 # Configure the tool
-cp config/config.yaml config/my_config.yaml
+cp config/config.yaml.example config/config.yaml
+
 # Edit config/config.yaml to add your API keys and customize settings
 
-# Optional: Clone or update your Lustre codebase
-# git clone https://github.com/lustre/lustre-release /path/to/lustre/repo
+# Optional: Clone your Lustre codebase
 # Important: Set the correct path to your Lustre repository in config.yaml
 # Note: The tool will clean the Lustre codebase before running reviews
 ```
