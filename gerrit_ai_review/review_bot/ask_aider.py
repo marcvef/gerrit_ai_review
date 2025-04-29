@@ -20,7 +20,7 @@ from aider.run_cmd import run_cmd
 from aider.repo import GitRepo
 
 # Import common utilities and configuration
-from util.review_common import ReviewConfig, print_green, print_yellow, print_red
+from gerrit_ai_review.utils.review_common import ReviewConfig, print_green, print_yellow, print_red
 
 class ReviewBot:
     """
