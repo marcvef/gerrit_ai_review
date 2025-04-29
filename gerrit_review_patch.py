@@ -20,11 +20,7 @@ from typing import Dict, Any, Optional
 from util.review_common import ReviewConfig, print_green, print_yellow, print_red
 
 # Import the run_review function from ask_aider.py
-from ask_aider import run_review
-
-
-# GerritConfig class has been removed and merged into ReviewConfig in util.review_common
-
+from ai.ask_aider import run_review
 
 class GerritClient:
     """Client for interacting with Gerrit."""
