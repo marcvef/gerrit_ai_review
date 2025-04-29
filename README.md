@@ -2,6 +2,8 @@
 
 A tool for AI-assisted code review of Gerrit patches.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Features
 
 - Connect to Gerrit and retrieve patches
@@ -76,3 +78,7 @@ gerrit:
     username: "your-username"
     password: "your-password"
 ```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
