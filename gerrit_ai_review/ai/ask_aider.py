@@ -82,7 +82,7 @@ class AiderReview:
         from aider.models import register_litellm_models
 
         # Get the metadata file path from configuration
-        metadata_file = self.config.model_metadata_file
+        metadata_file = self.config.aider_model_metadata_file
 
         try:
             # Check if the file exists
@@ -100,8 +100,8 @@ class AiderReview:
         """Set up the free Gemini model."""
         try:
             # Access the nested dictionary values directly
-            api_key = self.config.api_keys["free_gemini"]
-            model_name = self.config.models["free_model"]
+            api_key = self.config.aider_api_keys["free_gemini"]
+            model_name = self.config.aider_models["free_model"]
 
             if not api_key or not model_name:
                 raise ValueError("Missing API key or model name for free model")
@@ -117,8 +117,8 @@ class AiderReview:
         """Set up the paid Gemini model."""
         try:
             # Access the nested dictionary values directly
-            api_key = self.config.api_keys["paid_gemini"]
-            model_name = self.config.models["paid_model"]
+            api_key = self.config.aider_api_keys["paid_gemini"]
+            model_name = self.config.aider_models["paid_model"]
 
             if not api_key or not model_name:
                 raise ValueError("Missing API key or model name for paid model")
@@ -132,10 +132,10 @@ class AiderReview:
 
     def add_ro_refs_to_context(self):
         """Add the common AI reference to the chat context."""
-        if self.config.common_ai_refs:
+        if self.config.aider_common_ai_refs:
             # Convert relative paths to absolute paths
             absolute_paths = []
-            for file_path in self.config.common_ai_refs:
+            for file_path in self.config.aider_common_ai_refs:
                 # Check if the path is already absolute
                 if os.path.isabs(file_path):
                     absolute_paths.append(file_path)
@@ -187,7 +187,7 @@ class AiderReview:
 
         # Create a coder object with the specified repository
         # Use map_tokens from config to control token usage for the repository map
-        self.coder = Coder.create(main_model=model, fnames=[], repo=repo, map_tokens=self.config.map_tokens)
+        self.coder = Coder.create(main_model=model, fnames=[], repo=repo, map_tokens=self.config.aider_map_tokens)
 
         # Add files to the chat context
         self.add_ro_refs_to_context()
@@ -195,7 +195,7 @@ class AiderReview:
         # Print information about the working directory
         print_green(f"Working with Lustre repository at: {self.coder.root}", self)
         print_green(f"Files in chat context: {', '.join(self.coder.get_inchat_relative_files())}", self)
-        print_green(f"Using {self.config.map_tokens} tokens for repository map", self)
+        print_green(f"Using {self.config.aider_map_tokens} tokens for repository map", self)
 
         # Show initial token usage
         self.coder.run("/tokens")
@@ -382,11 +382,11 @@ class AiderReview:
             bool: True if the file is in an ignored directory, False otherwise
         """
         # If there are no ignored directories, return False
-        if not self.config.ignored_dirs:
+        if not self.config.aider_ignored_dirs:
             return False
 
         # Check if the file path starts with any of the ignored directories
-        for ignored_dir in self.config.ignored_dirs:
+        for ignored_dir in self.config.aider_ignored_dirs:
             if filepath.startswith(ignored_dir):
                 return True
 
@@ -485,7 +485,7 @@ class AiderReview:
         instruction_file = self.args.instruction
         if not instruction_file:
             # The default_instruction_file attribute is guaranteed to exist in ReviewConfig
-            instruction_file = self.config.default_instruction_file
+            instruction_file = self.config.aider_default_instruction_file
 
         # Read the instruction from the file
         try:
@@ -584,7 +584,7 @@ class AiderReview:
         added_files = self.add_most_changed_files_to_context(max_files=self.args.max_files)
 
         # Check token usage and remove files if it exceeds the threshold
-        # Note: We're using the configured map_tokens value for the repository map, but still respecting max_tokens for overall context
+        # Note: We're using the configured aider_map_tokens value for the repository map, but still respecting max_tokens for overall context
         self.check_and_manage_token_usage(self.args.max_tokens, added_files)
 
         # Read the instruction from file

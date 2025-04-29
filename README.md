@@ -27,22 +27,51 @@ python gerrit_review_patch.py <gerrit_url>  # Review a change from URL
 Create a `config/config.yaml` file with the following structure:
 
 ```yaml
+# Lustre project directory
 lustre_dir: "/path/to/lustre/repo"
-default_instruction_file: "config/default_instruction.txt"
-model_metadata_file: "config/model-metadata.json"
-max_tokens: 200000
-common_ai_refs:
-  - "ai_reference/lustre_arch.md"
-api_keys:
-  free_gemini: "your-free-api-key"
-  paid_gemini: "your-paid-api-key"
-models:
-  free_model: "gemini-1.0-pro"
-  paid_model: "gemini-1.5-pro"
+
+# Aider configuration
+aider:
+  # Default instruction file
+  default_instruction_file: "config/default_instruction.txt"
+
+  # Common AI references to add to the context
+  common_ai_refs:
+    - "ai_reference/lustre_arch.md"
+
+  # API keys
+  api_keys:
+    free_gemini: "your-free-api-key"
+    paid_gemini: "your-paid-api-key"
+
+  # Model settings
+  models:
+    free_model: "gemini-1.0-pro"
+    paid_model: "gemini-1.5-pro"
+
+  # Model metadata file path
+  model_metadata_file: "config/model-metadata.json"
+
+  # Token limits
+  max_tokens: 200000
+  map_tokens: 8192
+
+  # Directories to ignore when adding files to context
+  ignored_dirs:
+    - "lustre/tests"
+
+# Gerrit server settings
 gerrit:
+  # Gerrit server URL
   url: "https://review.example.com"
+
+  # Project name
   project: "project-name"
+
+  # Branch name
   branch: "main"
+
+  # Authentication settings
   auth:
     username: "your-username"
     password: "your-password"

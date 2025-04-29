@@ -82,14 +82,16 @@ class ReviewConfig:
         """
         # Initialize Review configuration attributes
         self.lustre_dir = None
-        self.default_instruction_file = None
-        self.common_ai_refs = None
-        self.api_keys = None
-        self.models = None
-        self.model_metadata_file = None
-        self.max_tokens = None
-        self.map_tokens = None
-        self.ignored_dirs = None
+
+        # Initialize Aider configuration attributes
+        self.aider_default_instruction_file = None
+        self.aider_common_ai_refs = None
+        self.aider_api_keys = None
+        self.aider_models = None
+        self.aider_model_metadata_file = None
+        self.aider_max_tokens = None
+        self.aider_map_tokens = None
+        self.aider_ignored_dirs = None
 
         # Initialize Gerrit configuration attributes
         self.gerrit_url = None
@@ -130,11 +132,7 @@ class ReviewConfig:
             # Required configuration fields
             required_fields = [
                 'lustre_dir',
-                'default_instruction_file',
-                'api_keys',
-                'models',
-                'model_metadata_file',
-                'max_tokens',
+                'aider',
                 'gerrit'
             ]
 
@@ -147,31 +145,52 @@ class ReviewConfig:
 
             # Basic settings
             self.lustre_dir = config['lustre_dir']
-            self.default_instruction_file = config['default_instruction_file']
-            self.model_metadata_file = config['model_metadata_file']
-            self.max_tokens = config['max_tokens']
-            self.map_tokens = config.get('map_tokens', 1024)  # Default to 1024 if not specified
+
+            # Load Aider configuration
+            aider_config = config.get('aider', {})
+
+            # Required Aider fields
+            required_aider_fields = [
+                'default_instruction_file',
+                'api_keys',
+                'models',
+                'model_metadata_file',
+                'max_tokens'
+            ]
+
+            # Check for missing required Aider fields
+            missing_aider_fields = [field for field in required_aider_fields if field not in aider_config]
+            if missing_aider_fields:
+                print_red(f"Missing required Aider configuration fields: {', '.join(missing_aider_fields)}", self)
+                print_red("Please add these fields to your configuration file.", self)
+                sys.exit(1)
+
+            # Basic Aider settings
+            self.aider_default_instruction_file = aider_config['default_instruction_file']
+            self.aider_model_metadata_file = aider_config['model_metadata_file']
+            self.aider_max_tokens = aider_config['max_tokens']
+            self.aider_map_tokens = aider_config.get('map_tokens', 1024)  # Default to 1024 if not specified
 
             # List attributes
-            self.common_ai_refs = config.get('common_ai_refs', [])
-            self.ignored_dirs = config.get('ignored_dirs', [])
+            self.aider_common_ai_refs = aider_config.get('common_ai_refs', [])
+            self.aider_ignored_dirs = aider_config.get('ignored_dirs', [])
 
             # Nested dictionaries
-            self.api_keys = {}
-            for key, value in config['api_keys'].items():
-                self.api_keys[key] = value
+            self.aider_api_keys = {}
+            for key, value in aider_config['api_keys'].items():
+                self.aider_api_keys[key] = value
 
-            self.models = {}
-            for key, value in config['models'].items():
-                self.models[key] = value
+            self.aider_models = {}
+            for key, value in aider_config['models'].items():
+                self.aider_models[key] = value
 
             # Check for required nested fields
-            if 'free_gemini' not in self.api_keys or 'paid_gemini' not in self.api_keys:
+            if 'free_gemini' not in self.aider_api_keys or 'paid_gemini' not in self.aider_api_keys:
                 print_red("Missing required API keys in configuration: free_gemini, paid_gemini", self)
                 print_red("Please add these keys to your configuration file.", self)
                 sys.exit(1)
 
-            if 'free_model' not in self.models or 'paid_model' not in self.models:
+            if 'free_model' not in self.aider_models or 'paid_model' not in self.aider_models:
                 print_red("Missing required model settings in configuration: free_model, paid_model", self)
                 print_red("Please add these settings to your configuration file.", self)
                 sys.exit(1)
