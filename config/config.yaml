@@ -8,7 +8,7 @@ default_instruction_file: "config/default_instruction.txt"
 
 # Common AI references to add to the context
 common_ai_refs:
-  - "/Users/mvef/PycharmProjects/Aider_hackathon/ai_reference/lustre_arch.md"
+  - "ai_reference/lustre_arch.md"
 
 # API keys
 api_keys:

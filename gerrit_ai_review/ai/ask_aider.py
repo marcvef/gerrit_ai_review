@@ -133,7 +133,22 @@ class AiderReview:
     def add_ro_refs_to_context(self):
         """Add the common AI reference to the chat context."""
         if self.config.common_ai_refs:
-            file_list = " ".join(self.config.common_ai_refs)
+            # Convert relative paths to absolute paths
+            absolute_paths = []
+            for file_path in self.config.common_ai_refs:
+                # Check if the path is already absolute
+                if os.path.isabs(file_path):
+                    absolute_paths.append(file_path)
+                else:
+                    # Get the project root directory
+                    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                    # Create absolute path
+                    abs_path = os.path.abspath(os.path.join(project_root, file_path))
+                    absolute_paths.append(abs_path)
+
+            # Join the absolute paths into a space-separated string
+            file_list = " ".join(absolute_paths)
+            print_green(f"Adding reference files to context: {file_list}", self)
             self.coder.run(f"/read-only {file_list}")
 
     def setup_environment(self):
