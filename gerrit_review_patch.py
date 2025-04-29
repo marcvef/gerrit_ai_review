@@ -188,10 +188,11 @@ class GerritReviewer:
                 max_tokens=None,      # Let AiderReview use the configured value
                 output_file=None,     # Don't save to a file
                 skip_confirmation=False, # Skip confirmation in automated mode
-                config_file=self.config_file  # Pass the configuration file
+                config_file=self.config_file,  # Pass the configuration file
+                backend="aider"       # Explicitly specify the backend to use
             )
 
-            if not review_result:
+            if review_result is None:
                 print_red("AiderReview did not produce a review", self)
                 return None
 

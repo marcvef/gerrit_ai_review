@@ -584,7 +584,7 @@ class AiderReview:
         # Show final token usage
         self.coder.run("/tokens")
 
-    def run(self):
+    def run_generic(self):
         """Run the complete review process."""
         # Set up the environment
         self.setup_environment()

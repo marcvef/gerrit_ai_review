@@ -7,6 +7,7 @@ This script provides a unified interface to different AI backends
 """
 
 import argparse
+import sys
 
 # Import AI integrations
 from gerrit_ai_review.ai.ask_aider import AiderReview
@@ -87,16 +88,15 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
     if backend == "aider":
         # Create an AiderReview instance with the args and config file
         bot = AiderReview(args=args, config_file=config_file)
-        return bot.run()
+        return bot.run_generic()
     elif backend == "augment":
         # Create an AugmentReview instance with the args and config file
         bot = AugmentReview(args=args, config_file=config_file)
         return bot.run()
     else:
         print_red(f"Unknown backend: {backend}")
-        print_yellow("Falling back to Aider backend")
-        bot = AiderReview(args=args, config_file=config_file)
-        return bot.run()
+        print_red("Error: Invalid backend specified. Please use 'aider' or 'augment'.")
+        return None
 
 def run_manual():
     """Main function to run the appropriate AI backend via CLI."""
@@ -111,7 +111,7 @@ def run_manual():
         backend = "aider"
 
     # Run the review with the selected backend
-    response = run_review(
+    run_review(
         use_paid_model=args.paid_model,
         max_files=args.max_files,
         max_tokens=args.max_tokens,
@@ -121,9 +121,3 @@ def run_manual():
         backend=backend,
         config_file=args.config
     )
-
-    # If the response is not being saved to a file, print it
-    if not args.output and response:
-        print(response)
-
-    return response
