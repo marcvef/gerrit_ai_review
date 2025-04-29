@@ -35,7 +35,9 @@ lustre_dir: "/path/to/lustre/repo"
 # Aider configuration
 aider:
   # Default instruction file
-  default_instruction_file: "config/default_instruction.txt"
+  generic_instruction_file: "config/instructions/generic.txt"
+  style_check_instruction_file: "config/instructions/style_check.txt"
+  static_analysis_instruction_file: "config/instructions/static_analysis.txt"
 
   # Common AI references to add to the context
   common_ai_refs:

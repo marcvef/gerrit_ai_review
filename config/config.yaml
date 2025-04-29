@@ -6,11 +6,20 @@ lustre_dir: "/Users/mvef/git_wip/lustre-release"
 # Aider configuration
 aider:
   # Default instruction file
-  default_instruction_file: "config/default_instruction.txt"
+  generic_instruction_file: "config/instructions/generic.txt"
+  style_check_instruction_file: "config/instructions/style_check.txt"
+  static_analysis_instruction_file: "config/instructions/static_analysis.txt"
 
   # Common AI references to add to the context
   common_ai_refs:
     - "ai_reference/lustre_arch.md"
+
+  style_check_ai_refs:
+    - "ai_reference/lustre_code_style.md"
+    - "ai_reference/linux_code_style.md"
+
+  static_analysis_ai_refs:
+    - "ai_reference/static_analysis.md"
 
   # API keys
   api_keys:

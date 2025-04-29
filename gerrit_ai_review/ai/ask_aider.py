@@ -59,8 +59,6 @@ class AiderReview:
 
         # Initialize other attributes
         self.coder = None
-        self.instruction = None
-        self.response = None
 
         # Register model metadata
         self.register_model_metadata()
@@ -142,26 +140,30 @@ class AiderReview:
             print_yellow("Unable to initialize paid model.", self)
             return None
 
-    def add_ro_refs_to_context(self):
-        """Add the common AI reference to the chat context."""
-        if self.config.aider_common_ai_refs:
-            # Convert relative paths to absolute paths
-            absolute_paths = []
-            for file_path in self.config.aider_common_ai_refs:
-                # Check if the path is already absolute
-                if os.path.isabs(file_path):
-                    absolute_paths.append(file_path)
-                else:
-                    # Get the project root directory
-                    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                    # Create absolute path
-                    abs_path = os.path.abspath(os.path.join(project_root, file_path))
-                    absolute_paths.append(abs_path)
+    def add_ro_refs_to_context(self, ro_refs):
+        """Add the ro AI reference to the chat context."""
 
-            # Join the absolute paths into a space-separated string
-            file_list = " ".join(absolute_paths)
-            print_green(f"Adding reference files to context: {file_list}", self)
-            self.coder.run(f"/read-only {file_list}")
+        if ro_refs is None:
+            print_yellow("No config provided, skipping adding ro refs to context", self)
+            return
+
+        # Convert relative paths to absolute paths
+        absolute_paths = []
+        for file_path in ro_refs:
+            # Check if the path is already absolute
+            if os.path.isabs(file_path):
+                absolute_paths.append(file_path)
+            else:
+                # Get the project root directory
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                # Create absolute path
+                abs_path = os.path.abspath(os.path.join(project_root, file_path))
+                absolute_paths.append(abs_path)
+
+        # Join the absolute paths into a space-separated string
+        file_list = " ".join(absolute_paths)
+        print_green(f"Adding reference files to context: {file_list}", self)
+        self.coder.run(f"/read-only {file_list}")
 
     def setup_environment(self):
         """Set up the Lustre environment and create Aider objects."""
@@ -201,17 +203,11 @@ class AiderReview:
         # Use map_tokens from config to control token usage for the repository map
         self.coder = Coder.create(main_model=model, fnames=[], repo=repo, map_tokens=self.config.aider_map_tokens)
 
-        # Add files to the chat context
-        self.add_ro_refs_to_context()
-
+    def env_stats(self):
         # Print information about the working directory
         print_green(f"Working with Lustre repository at: {self.coder.root}", self)
         print_green(f"Files in chat context: {', '.join(self.coder.get_inchat_relative_files())}", self)
         print_green(f"Using {self.config.aider_map_tokens} tokens for repository map", self)
-
-        # Show initial token usage
-        self.coder.run("/tokens")
-
 
     def add_command_output_to_context(self, command, add_to_context=True,
                                      assistant_response="I've received the command output and will take it into account."):
@@ -250,7 +246,7 @@ class AiderReview:
 
         return True, output
 
-    def add_git_show_to_context(self, commit_hash="HEAD"):
+    def add_git_show_to_context(self, commit_hash="HEAD", use_func_context=False):
         """
         Add the output of git show for a specific commit to the chat context.
 
@@ -260,8 +256,13 @@ class AiderReview:
         Returns:
             bool: True if successful, False otherwise
         """
+        git_args = ""
+
+        if use_func_context:
+            git_args += "--function-context"
+
         success, _ = self.add_command_output_to_context(
-            f"git --no-pager show {commit_hash}",
+            f"git --no-pager {git_args} show {commit_hash}",
             assistant_response="I'll analyze this commit in my response."
         )
         return success
@@ -491,19 +492,16 @@ class AiderReview:
             print_yellow("Could not add any of the changed files to context", self)
             return []
 
-    def read_instruction(self):
+    def read_instruction(self, instruction_file):
         """Read the instruction from the specified file or the default template."""
-        # Determine which instruction file to use
-        instruction_file = self.args.instruction
-        if not instruction_file:
-            # The default_instruction_file attribute is guaranteed to exist in ReviewConfig
-            instruction_file = self.config.aider_default_instruction_file
 
+        instruction = ""
         # Read the instruction from the file
         try:
             with open(instruction_file, 'r') as f:
-                self.instruction = f.read()
+                instruction = f.read()
             print_green(f"Using instruction from file: {instruction_file}", self)
+            return instruction
         except Exception as e:
             print_red(f"Error reading instruction file {instruction_file}: {e}", self)
             if self.args.instruction:
@@ -513,9 +511,9 @@ class AiderReview:
                 print_red("Please create this file or specify a different file using the -i parameter.", self)
             sys.exit(1)
 
-    def save_response_to_file(self):
+    def save_response_to_file(self, response):
         """Save the response to the specified file if provided."""
-        if not self.response:
+        if not response or response == "":
             print_yellow("No response to save.", self)
             return
 
@@ -534,7 +532,7 @@ class AiderReview:
 
             # Write the response to the file
             with open(output_file, "w") as f:
-                f.write(self.response)
+                f.write(response)
             print_green(f"Response has been written to {output_file}", self)
         except IOError as e:
             print_red(f"Error writing to file {output_file}: {e}", self)
@@ -558,8 +556,12 @@ class AiderReview:
             else:
                 print("Please enter 'y' or 'n'.")
 
-    def execute_instruction(self):
+    def execute_instruction(self, instruction):
         """Execute the instruction and save the response to a file."""
+        if instruction is None or instruction == "":
+            print_yellow("No instruction provided, exiting.", self)
+            sys.exit(1)
+
         # Show token usage and ask for confirmation
         self.coder.run("/tokens")
         print_green("Token usage information is displayed above. Please review the cost before proceeding.", self)
@@ -576,21 +578,31 @@ class AiderReview:
             return
 
         # Execute the instruction
-        self.response = self.coder.run(self.instruction)
+        response = self.coder.run(instruction)
 
         # Save the response to a file
-        self.save_response_to_file()
+        self.save_response_to_file(response)
 
         # Show final token usage
         self.coder.run("/tokens")
 
+        return response
+
     def run_generic(self):
         """Run the complete review process."""
         # Set up the environment
-        self.setup_environment()
+        if self.coder is None:
+            self.setup_environment()
+        else:
+            self.coder.run("/reset")
+
+        self.env_stats()
+
+        # Add files to the chat context
+        self.add_ro_refs_to_context(self.config.aider_common_ai_refs)
 
         # Add git show output to context
-        self.add_git_show_to_context()
+        self.add_git_show_to_context()    
 
         # Add the most changed files to context
         # The max_files value is already set in the constructor with fallback to config
@@ -602,9 +614,40 @@ class AiderReview:
         self.check_and_manage_token_usage(self.args.max_tokens, added_files)
 
         # Read the instruction from file
-        self.read_instruction()
+        instruction = self.read_instruction(self.config.aider_generic_instruction_file)
 
         # Execute the instruction and save the response
-        self.execute_instruction()
+        response = self.execute_instruction(instruction)
 
-        return self.response
+        return response
+
+    def run_style_check(self):
+        # Set up the environment
+        if self.coder is None:
+            self.setup_environment()
+        else:
+            self.coder.run("/reset")
+
+        self.env_stats()
+
+        self.add_ro_refs_to_context(self.config.aider_style_check_ai_refs)
+
+        # Add git show output to context
+        self.add_git_show_to_context(use_func_context=True)
+
+        self.check_and_manage_token_usage(self.args.max_tokens)
+
+    def run_static_analysis(self):
+        if self.coder is None:
+            self.setup_environment()
+        else:
+            self.coder.run("/reset")
+
+        self.env_stats()
+
+        self.add_ro_refs_to_context(self.config.aider_static_analysis_ai_refs)
+
+        # Add git show output to context
+        self.add_git_show_to_context(use_func_context=True)
+
+        self.check_and_manage_token_usage(self.args.max_tokens)

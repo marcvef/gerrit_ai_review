@@ -84,8 +84,10 @@ class ReviewConfig:
         self.lustre_dir = None
 
         # Initialize Aider configuration attributes
-        self.aider_default_instruction_file = None
+        self.aider_generic_instruction_file = None
         self.aider_common_ai_refs = None
+        self.aider_style_check_ai_refs = None
+        self.aider_static_analysis_ai_refs = None
         self.aider_api_keys = None
         self.aider_models = None
         self.aider_model_metadata_file = None
@@ -152,7 +154,7 @@ class ReviewConfig:
 
             # Required Aider fields
             required_aider_fields = [
-                'default_instruction_file',
+                'generic_instruction_file',
                 'api_keys',
                 'models',
                 'model_metadata_file',
@@ -167,7 +169,7 @@ class ReviewConfig:
                 sys.exit(1)
 
             # Basic Aider settings
-            self.aider_default_instruction_file = aider_config['default_instruction_file']
+            self.aider_generic_instruction_file = aider_config['generic_instruction_file']
             self.aider_model_metadata_file = aider_config['model_metadata_file']
             self.aider_max_tokens = aider_config['max_tokens']
             self.aider_map_tokens = aider_config.get('map_tokens', 1024)  # Default to 1024 if not specified
@@ -175,6 +177,8 @@ class ReviewConfig:
 
             # List attributes
             self.aider_common_ai_refs = aider_config.get('common_ai_refs', [])
+            self.aider_style_check_ai_refs = aider_config.get('style_check_ai_refs', [])
+            self.aider_static_analysis_ai_refs = aider_config.get('static_analysis_ai_refs', [])
             self.aider_ignored_dirs = aider_config.get('ignored_dirs', [])
 
             # Nested dictionaries
