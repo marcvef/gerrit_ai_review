@@ -13,20 +13,55 @@ YELLOW = "\033[33m"
 RED = "\033[31m"
 RESET = "\033[0m"
 
+def sanitize_print_msg(message):
+    return str(message).replace('\r', '')
 
-def print_green(message):
-    """Print a regular message with a green prefix to distinguish from Aider output."""
-    print(f"{GREEN}* [g ♥ a]{RESET} {message}")
+def print_green(message, cls=None):
+    """
+    Print a regular message with a green prefix to distinguish from Aider output.
+
+    Args:
+        message: The message to print
+        cls: Optional class instance or class name to include in the prefix
+    """
+    class_name = f" - {cls.__class__.__name__}" if cls is not None else ""
+
+    # fix cariage return
+    message = sanitize_print_msg(message)
+
+    print(f"{GREEN}* [Gerrit ♥ AI{class_name}]{RESET} {message}")
 
 
-def print_yellow(message):
-    """Print a warning message with a yellow prefix to distinguish from Aider output."""
-    print(f"{YELLOW}* [g ♥ a]{RESET} {message}")
+def print_yellow(message, cls=None):
+    """
+    Print a warning message with a yellow prefix to distinguish from Aider output.
+
+    Args:
+        message: The message to print
+        cls: Optional class instance or class name to include in the prefix
+    """
+    class_name = f" - {cls.__class__.__name__}" if cls is not None else ""
+
+    # fix cariage return
+    message = sanitize_print_msg(message)
+
+    print(f"{YELLOW}* [Gerrit ♥ AI{class_name}]{RESET} {message}")
 
 
-def print_red(message):
-    """Print an error message with a red prefix to distinguish from Aider output."""
-    print(f"{RED}* [g ♥ a]{RESET} {message}")
+def print_red(message, cls=None):
+    """
+    Print an error message with a red prefix to distinguish from Aider output.
+
+    Args:
+        message: The message to print
+        cls: Optional class instance or class name to include in the prefix
+    """
+    class_name = f" - {cls.__class__.__name__}" if cls is not None else ""
+
+    # fix cariage return
+    message = sanitize_print_msg(message)
+
+    print(f"{RED}* [Gerrit ♥ AI{class_name}]{RESET} {message}")
 
 
 class ReviewConfig:
@@ -76,19 +111,19 @@ class ReviewConfig:
         try:
             # Check if the configuration file exists
             if not os.path.exists(self.config_file):
-                print_red(f"Configuration file not found: {self.config_file}")
-                print_red("Please create a configuration file.")
+                print_red(f"Configuration file not found: {self.config_file}", self)
+                print_red("Please create a configuration file.", self)
                 sys.exit(1)
 
             # Load the configuration file
             with open(self.config_file, 'r') as f:
                 config = yaml.safe_load(f)
-            print_green(f"Loaded configuration from {self.config_file}")
+            print_green(f"Loaded configuration from {self.config_file}", self)
 
             # Check if the configuration is empty
             if not config:
-                print_red(f"Configuration file is empty: {self.config_file}")
-                print_red("Please add the required configuration settings.")
+                print_red(f"Configuration file is empty: {self.config_file}", self)
+                print_red("Please add the required configuration settings.", self)
                 sys.exit(1)
 
             # Required configuration fields
@@ -105,8 +140,8 @@ class ReviewConfig:
             # Check for missing required fields
             missing_fields = [field for field in required_fields if field not in config]
             if missing_fields:
-                print_red(f"Missing required configuration fields: {', '.join(missing_fields)}")
-                print_red("Please add these fields to your configuration file.")
+                print_red(f"Missing required configuration fields: {', '.join(missing_fields)}", self)
+                print_red("Please add these fields to your configuration file.", self)
                 sys.exit(1)
 
             # Basic settings
@@ -130,13 +165,13 @@ class ReviewConfig:
 
             # Check for required nested fields
             if 'free_gemini' not in self.api_keys or 'paid_gemini' not in self.api_keys:
-                print_red("Missing required API keys in configuration: free_gemini, paid_gemini")
-                print_red("Please add these keys to your configuration file.")
+                print_red("Missing required API keys in configuration: free_gemini, paid_gemini", self)
+                print_red("Please add these keys to your configuration file.", self)
                 sys.exit(1)
 
             if 'free_model' not in self.models or 'paid_model' not in self.models:
-                print_red("Missing required model settings in configuration: free_model, paid_model")
-                print_red("Please add these settings to your configuration file.")
+                print_red("Missing required model settings in configuration: free_model, paid_model", self)
+                print_red("Please add these settings to your configuration file.", self)
                 sys.exit(1)
 
             # Load Gerrit configuration
@@ -148,8 +183,8 @@ class ReviewConfig:
             # Check for missing required Gerrit fields
             missing_gerrit_fields = [field for field in required_gerrit_fields if field not in gerrit_config]
             if missing_gerrit_fields:
-                print_red(f"Missing required Gerrit configuration fields: {', '.join(missing_gerrit_fields)}")
-                print_red("Please add these fields to your configuration file.")
+                print_red(f"Missing required Gerrit configuration fields: {', '.join(missing_gerrit_fields)}", self)
+                print_red("Please add these fields to your configuration file.", self)
                 sys.exit(1)
 
             # Basic Gerrit settings
@@ -160,16 +195,16 @@ class ReviewConfig:
             # Auth settings
             auth_config = gerrit_config.get('auth', {})
             if 'username' not in auth_config or 'password' not in auth_config:
-                print_red("Missing required Gerrit auth fields: username, password")
-                print_red("Please add these fields to your configuration file.")
+                print_red("Missing required Gerrit auth fields: username, password", self)
+                print_red("Please add these fields to your configuration file.", self)
                 sys.exit(1)
 
             self.gerrit_username = auth_config['username']
             self.gerrit_password = auth_config['password']
 
         except yaml.YAMLError as e:
-            print_red(f"Error parsing YAML in configuration file {self.config_file}: {e}")
+            print_red(f"Error parsing YAML in configuration file {self.config_file}: {e}", self)
             sys.exit(1)
         except Exception as e:
-            print_red(f"Error loading configuration from {self.config_file}: {e}")
+            print_red(f"Error loading configuration from {self.config_file}: {e}", self)
             sys.exit(1)

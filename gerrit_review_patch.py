@@ -64,21 +64,21 @@ class GerritReviewer:
         # Get the change details
         change = self.gerrit_client.get_change_by_id(change_id)
         if not change:
-            print_red(f"Change {change_id} not found.")
+            print_red(f"Change {change_id} not found.", self)
             return None
 
         # Get the checkout command
         checkout_cmd = self.gerrit_client.get_checkout_url(change)
         if not checkout_cmd:
-            print_red(f"Could not get checkout command for change {change_id}.")
+            print_red(f"Could not get checkout command for change {change_id}.", self)
             return None
 
-        print_green(f"Checking out change {change_id}...")
-        print_green(f"Command: {checkout_cmd}")
+        print_green(f"Checking out change {change_id}...", self)
+        print_green(f"Command: {checkout_cmd}", self)
 
         # Verify that the Lustre directory exists
         if not os.path.isdir(self.lustre_dir):
-            print_red(f"Lustre directory not found: {self.lustre_dir}")
+            print_red(f"Lustre directory not found: {self.lustre_dir}", self)
             return None
 
         # Save the current working directory
@@ -86,60 +86,60 @@ class GerritReviewer:
 
         try:
             # Change to the Lustre git directory
-            print_green(f"Changing to Lustre directory: {self.lustre_dir}")
+            print_green(f"Changing to Lustre directory: {self.lustre_dir}", self)
             os.chdir(self.lustre_dir)
 
             # Clean the git directory of any changes
-            print_green("Cleaning git directory...")
+            print_green("Cleaning git directory...", self)
 
             # Check if there are any uncommitted changes
             status_cmd = "git status --porcelain"
             status_result = subprocess.run(status_cmd, shell=True, capture_output=True, text=True)
 
             if status_result.stdout.strip():
-                print_yellow("Uncommitted changes found in the repository.")
-                print_yellow("Running git reset --hard to clean the working directory...")
+                print_yellow("Uncommitted changes found in the repository.", self)
+                print_yellow("Running git reset --hard to clean the working directory...", self)
 
                 # Reset any uncommitted changes
                 reset_cmd = "git reset --hard"
                 reset_result = subprocess.run(reset_cmd, shell=True, capture_output=True, text=True)
 
                 if reset_result.returncode != 0:
-                    print_red(f"Error resetting git repository: {reset_result.stderr}")
+                    print_red(f"Error resetting git repository: {reset_result.stderr}", self)
                     return None
             else:
-                print_green("Git repository has no uncommitted changes.")
+                print_green("Git repository has no uncommitted changes.", self)
 
             # Clean untracked files and directories
-            print_yellow("Running git clean -df to remove untracked files and directories...")
+            print_yellow("Running git clean -df to remove untracked files and directories...", self)
             clean_cmd = "git clean -df"
             clean_result = subprocess.run(clean_cmd, shell=True, capture_output=True, text=True)
 
             if clean_result.returncode != 0:
-                print_red(f"Error cleaning git repository: {clean_result.stderr}")
+                print_red(f"Error cleaning git repository: {clean_result.stderr}", self)
                 return None
 
-            print_green("Git repository cleaned successfully.")
+            print_green("Git repository cleaned successfully.", self)
 
             # Execute the checkout command
-            print_green("Executing checkout command...")
+            print_green("Executing checkout command...", self)
             checkout_result = subprocess.run(checkout_cmd, shell=True, capture_output=True, text=True)
 
             if checkout_result.returncode != 0:
-                print_red(f"Error checking out patch: {checkout_result.stderr}")
+                print_red(f"Error checking out patch: {checkout_result.stderr}", self)
                 return None
 
-            print_green("Patch checked out successfully.")
+            print_green("Patch checked out successfully.", self)
 
             # Verify that we're on the right commit
             verify_cmd = "git log -1 --oneline"
             verify_result = subprocess.run(verify_cmd, shell=True, capture_output=True, text=True)
-            print_green(f"Current commit: {verify_result.stdout.strip()}")
+            print_green(f"Current commit: {verify_result.stdout.strip()}", self)
 
             return change
 
         except Exception as e:
-            print_red(f"Error during checkout: {e}")
+            print_red(f"Error during checkout: {e}", self)
             return None
 
         finally:
@@ -156,12 +156,12 @@ class GerritReviewer:
         Returns:
             The review comment if successful, None otherwise
         """
-        print_green("Running AiderReview on the patch...")
+        print_green("Running AiderReview on the patch...", self)
 
         try:
             # Get the change subject as a description
             subject = change.get('subject', 'No subject')
-            print_green(f"Change subject: {subject}")
+            print_green(f"Change subject: {subject}", self)
 
             # Get the current revision
             current_revision = change.get('current_revision')
@@ -175,7 +175,7 @@ class GerritReviewer:
             change_number = change.get('_number', 'unknown')
 
             # Run the review
-            print_green(f"Running review for change {change_number}...")
+            print_green(f"Running review for change {change_number}...", self)
             review_result = run_review(
                 use_paid_model=True,  # Use the free model by default
                 max_files=5,           # Allow more files for Gerrit reviews
@@ -185,16 +185,16 @@ class GerritReviewer:
             )
 
             if not review_result:
-                print_red("AiderReview did not produce a review")
+                print_red("AiderReview did not produce a review", self)
                 return None
 
-            print_green("Review completed successfully")
+            print_green("Review completed successfully", self)
 
             # Return the review result
             return review_result
 
         except Exception as e:
-            print_red(f"Error running ReviewBot: {e}")
+            print_red(f"Error running ReviewBot: {e}", self)
             return None
 
     def post_review(self, change: Dict[str, Any], review_comment: str) -> bool:
@@ -208,7 +208,7 @@ class GerritReviewer:
         Returns:
             True if successful, False otherwise
         """
-        print_green(f"Posting review comment to change {change.get('_number')}...")
+        print_green(f"Posting review comment to change {change.get('_number')}...", self)
         return self.gerrit_client.post_review(change, review_comment)
 
     def review_patch(self, change_id: str) -> bool:

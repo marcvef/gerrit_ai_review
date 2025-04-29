@@ -42,14 +42,14 @@ class GerritClient:
             if response.status_code == 200:
                 # Gerrit uses " )]}'" to guard against XSSI
                 version = json.loads(response.content[5:])
-                print_green(f"Successfully connected to Gerrit at {self.config.gerrit_url}")
-                print_green(f"Gerrit version: {version}")
+                print_green(f"Successfully connected to Gerrit at {self.config.gerrit_url}", self)
+                print_green(f"Gerrit version: {version}", self)
                 return True
             else:
-                print_red(f"Failed to connect to Gerrit: {response.status_code} {response.reason}")
+                print_red(f"Failed to connect to Gerrit: {response.status_code} {response.reason}", self)
                 return False
         except Exception as e:
-            print_red(f"Error connecting to Gerrit: {e}")
+            print_red(f"Error connecting to Gerrit: {e}", self)
             return False
 
     def get_change_by_id(self, change_id: str) -> Dict[str, Any]:
@@ -74,8 +74,8 @@ class GerritClient:
         response = requests.get(f"{self.config.gerrit_url}/a{path}", auth=self.auth)
 
         if response.status_code != 200:
-            print_red(f"Error getting change: {response.status_code} {response.reason}")
-            print_red(response.text)
+            print_red(f"Error getting change: {response.status_code} {response.reason}", self)
+            print_red(response.text, self)
             return None
 
         # Gerrit uses " )]}'" to guard against XSSI
@@ -129,13 +129,13 @@ class GerritClient:
             True if the review was posted successfully, False otherwise
         """
         if not change:
-            print_red("Cannot post review: No change provided")
+            print_red("Cannot post review: No change provided", self)
             return False
 
         # Get the current revision
         current_revision = change.get('current_revision')
         if not current_revision:
-            print_red("Cannot post review: No current revision found")
+            print_red("Cannot post review: No current revision found", self)
             return False
 
         # Prepare the review input
@@ -155,14 +155,14 @@ class GerritClient:
             )
 
             if response.status_code == 200:
-                print_green("Review posted successfully")
+                print_green("Review posted successfully", self)
                 return True
             else:
-                print_red(f"Error posting review: {response.status_code} {response.reason}")
-                print_red(response.text)
+                print_red(f"Error posting review: {response.status_code} {response.reason}", self)
+                print_red(response.text, self)
                 return False
         except Exception as e:
-            print_red(f"Error posting review: {e}")
+            print_red(f"Error posting review: {e}", self)
             return False
 
     @staticmethod
@@ -223,6 +223,3 @@ class GerritClient:
         except Exception as e:
             print_red(f"Error extracting change ID from URL: {e}")
             return url
-
-
-

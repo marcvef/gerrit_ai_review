@@ -33,7 +33,7 @@ class AugmentReview:
         self._validate_args(args)
         self.args = args
 
-        print_yellow("AugmentReview is not implemented yet")
+        print_yellow("AugmentReview is not implemented yet", self)
 
     def _validate_args(self, args):
         """
@@ -62,5 +62,5 @@ class AugmentReview:
     def run(self):
         """Run the complete review process."""
         # This is a placeholder implementation
-        print_yellow("AugmentReview.run() is not implemented yet")
+        print_yellow("AugmentReview.run() is not implemented yet", self)
         return "AugmentReview is not implemented yet"

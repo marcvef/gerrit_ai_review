@@ -89,12 +89,12 @@ class AiderReview:
             if os.path.exists(metadata_file):
                 # Register the model metadata
                 register_litellm_models([metadata_file])
-                print_green(f"Loaded model metadata from: {metadata_file}")
+                print_green(f"Loaded model metadata from: {metadata_file}", self)
             else:
-                print_yellow(f"Model metadata file not found: {metadata_file}")
-                print_yellow("Token limits will use Aider's default values")
+                print_yellow(f"Model metadata file not found: {metadata_file}", self)
+                print_yellow("Token limits will use Aider's default values", self)
         except Exception as e:
-            print_red(f"Error loading model metadata: {e}")
+            print_red(f"Error loading model metadata: {e}", self)
 
     def setup_free_model(self):
         """Set up the free Gemini model."""
@@ -109,8 +109,8 @@ class AiderReview:
             os.environ["GEMINI_API_KEY"] = api_key
             return Model(model_name)
         except (AttributeError, KeyError, ValueError) as e:
-            print_yellow(f"Warning: Missing free model configuration: {e}")
-            print_yellow("Check your config file.")
+            print_yellow(f"Warning: Missing free model configuration: {e}", self)
+            print_yellow("Check your config file.", self)
             return None
 
     def setup_paid_model(self):
@@ -126,8 +126,8 @@ class AiderReview:
             os.environ["GEMINI_API_KEY"] = api_key
             return Model(model_name)
         except (AttributeError, KeyError, ValueError) as e:
-            print_yellow(f"Warning: Missing paid model configuration: {e}")
-            print_yellow("Unable to initialize paid model.")
+            print_yellow(f"Warning: Missing paid model configuration: {e}", self)
+            print_yellow("Unable to initialize paid model.", self)
             return None
 
     def add_ro_refs_to_context(self):
@@ -140,31 +140,31 @@ class AiderReview:
         """Set up the Lustre environment and create Aider objects."""
         # Verify the Lustre directory exists
         if not os.path.isdir(self.config.lustre_dir):
-            print_red(f"Error: Lustre directory not found at {self.config.lustre_dir}")
-            print_red("Please update the lustre_dir setting in your configuration file")
+            print_red(f"Error: Lustre directory not found at {self.config.lustre_dir}", self)
+            print_red("Please update the lustre_dir setting in your configuration file", self)
             sys.exit(1)
 
         # Initialize the model based on command-line arguments
         if self.args.paid_model:
-            print_green("Using paid model as specified by command-line argument")
+            print_green("Using paid model as specified by command-line argument", self)
             model = self.setup_paid_model()
         else:
             # Default to free model if not specified or if --free-model is used
-            print_green("Using free model" + (" as specified by command-line argument" if self.args.free_model else " (default)"))
+            print_green("Using free model" + (" as specified by command-line argument" if self.args.free_model else " (default)"), self)
             model = self.setup_free_model()
 
         # If the selected model failed to initialize, try the alternative
         if model is None:
             if self.args.paid_model:
-                print_green("Paid model initialization failed, falling back to free model")
+                print_green("Paid model initialization failed, falling back to free model", self)
                 model = self.setup_free_model()
             elif not self.args.free_model:  # Only try paid model if free model was the default
-                print_green("Free model initialization failed, trying paid model")
+                print_green("Free model initialization failed, trying paid model", self)
                 model = self.setup_paid_model()
 
         # If we still don't have a valid model, exit
         if model is None:
-            print_red("Error: Failed to initialize any model. Please check your configuration.")
+            print_red("Error: Failed to initialize any model. Please check your configuration.", self)
             sys.exit(1)
 
         # Create a GitRepo object pointing to the Lustre directory
@@ -177,8 +177,8 @@ class AiderReview:
         self.add_ro_refs_to_context()
 
         # Print information about the working directory
-        print_green(f"Working with Lustre repository at: {self.coder.root}")
-        print_green(f"Files in chat context: {', '.join(self.coder.get_inchat_relative_files())}")
+        print_green(f"Working with Lustre repository at: {self.coder.root}", self)
+        print_green(f"Files in chat context: {', '.join(self.coder.get_inchat_relative_files())}", self)
 
         # Show initial token usage
         self.coder.run("/tokens")
@@ -198,12 +198,12 @@ class AiderReview:
             tuple: (success, output) where success is a boolean indicating if the command produced output
                   and output is the command's output as a string
         """
-        print_green(f"Running command: {command}")
+        print_green(f"Running command: {command}", self)
         # Use the repository's root directory for command execution
         _, output = run_cmd(command, cwd=self.coder.root)
 
         if not output:
-            print_yellow("Command produced no output")
+            print_yellow("Command produced no output", self)
             return False, ""
 
         # Format the command output as a message
@@ -215,9 +215,9 @@ class AiderReview:
                 dict(role="user", content=formatted_output),
                 dict(role="assistant", content=assistant_response),
             ]
-            print_green(f"Added command output to chat context ({len(output.splitlines())} lines)")
+            print_green(f"Added command output to chat context ({len(output.splitlines())} lines)", self)
         else:
-            print_green(f"Command output ({len(output.splitlines())} lines) not added to context")
+            print_green(f"Command output ({len(output.splitlines())} lines) not added to context", self)
 
         return True, output
 
@@ -252,20 +252,20 @@ class AiderReview:
             return True
 
         # Get the current token usage
-        print_green("Checking token usage...")
+        print_green("Checking token usage...", self)
 
         # Get the current token count from the model
         token_count = self.get_current_token_count()
 
         if token_count is None:
-            print_yellow("Could not determine token usage, keeping all files")
+            print_yellow("Could not determine token usage, keeping all files", self)
             return True
 
-        print_green(f"Current token usage: {token_count:,} tokens")
+        print_green(f"Current token usage: {token_count:,} tokens", self)
 
         # If token usage exceeds the threshold, remove files with the least changes
         if token_count > max_tokens:
-            print_yellow(f"Token usage exceeds threshold of {max_tokens:,} tokens")
+            print_yellow(f"Token usage exceeds threshold of {max_tokens:,} tokens", self)
 
             # Sort added files by changes (ascending)
             sorted_files = sorted(added_files, key=lambda x: x[1])
@@ -275,7 +275,7 @@ class AiderReview:
             for filename, changes in sorted_files:
                 # Remove the file from context
                 try:
-                    print_yellow(f"Removing {filename} ({changes} changes) to reduce token usage")
+                    print_yellow(f"Removing {filename} ({changes} changes) to reduce token usage", self)
                     self.coder.run(f"/drop {filename}")
                     files_removed.append((filename, changes))
 
@@ -284,16 +284,16 @@ class AiderReview:
                     if new_token_count is None or new_token_count <= max_tokens:
                         break
                 except Exception as e:
-                    print_yellow(f"Could not remove {filename} from context: {e}")
+                    print_yellow(f"Could not remove {filename} from context: {e}", self)
 
             if files_removed:
-                print_yellow(f"Removed {len(files_removed)} files to reduce token usage")
+                print_yellow(f"Removed {len(files_removed)} files to reduce token usage", self)
                 new_token_count = self.get_current_token_count()
                 if new_token_count is not None:
-                    print_green(f"New token usage: {new_token_count:,} tokens")
+                    print_green(f"New token usage: {new_token_count:,} tokens", self)
                 return False
             else:
-                print_yellow("Could not remove any files to reduce token usage")
+                print_yellow("Could not remove any files to reduce token usage", self)
                 return False
 
         return True
@@ -351,7 +351,7 @@ class AiderReview:
 
             return None
         except Exception as e:
-            print_yellow(f"Error getting token count: {e}")
+            print_yellow(f"Error getting token count: {e}", self)
             return None
 
     def is_in_ignored_dir(self, filepath):
@@ -386,14 +386,14 @@ class AiderReview:
         Returns:
             list: List of tuples (filename, changes) for files that were added
         """
-        print_green(f"Finding the {max_files} most changed files in commit {commit_hash}...")
+        print_green(f"Finding the {max_files} most changed files in commit {commit_hash}...", self)
 
         # Get the list of files changed in the commit with their stats
         cmd = f"git --no-pager diff --numstat {commit_hash}^ {commit_hash}"
         _, output = run_cmd(cmd, cwd=self.coder.root)
 
         if not output:
-            print_yellow(f"No changes found in commit {commit_hash}")
+            print_yellow(f"No changes found in commit {commit_hash}", self)
             return False
 
         # Parse the output to get files and their change counts
@@ -420,7 +420,7 @@ class AiderReview:
 
                 # Check if the file is in an ignored directory
                 if self.is_in_ignored_dir(filename):
-                    print_yellow(f"Skipping {filename} (in ignored directory)")
+                    print_yellow(f"Skipping {filename} (in ignored directory)", self)
                     continue
 
                 file_changes.append((filename, total_changes))
@@ -434,7 +434,7 @@ class AiderReview:
         top_files = file_changes[:max_files]
 
         if not top_files:
-            print_yellow("No text files with changes found in the commit")
+            print_yellow("No text files with changes found in the commit", self)
             return False
 
         # Add the files to the context
@@ -443,23 +443,23 @@ class AiderReview:
             # Try to add the file directly without checking if it exists
             # Aider's /add command will handle the path resolution
             try:
-                print_green(f"Attempting to add {filename} to context...")
-
+                print_green(f"Attempting to add {filename} to context...", self)
+                
                 # Use the file path as reported by git
                 self.coder.run(f"/add {filename}")
                 added_files.append((filename, changes))
 
             except Exception as e:
-                    print_yellow(f"Could not add {filename} to context: {e}")
+                    print_yellow(f"Could not add {filename} to context: {e}", self)
 
         # Report what was added
         if added_files:
-            print_green("Added the following files to context:")
+            print_green("Added the following files to context:", self)
             for filename, changes in added_files:
-                print_green(f"  - {filename} ({changes} changes)")
+                print_green(f"  - {filename} ({changes} changes)", self)
             return added_files
         else:
-            print_yellow("Could not add any of the changed files to context")
+            print_yellow("Could not add any of the changed files to context", self)
             return []
 
     def read_instruction(self):
@@ -474,26 +474,26 @@ class AiderReview:
         try:
             with open(instruction_file, 'r') as f:
                 self.instruction = f.read()
-            print_green(f"Using instruction from file: {instruction_file}")
+            print_green(f"Using instruction from file: {instruction_file}", self)
         except Exception as e:
-            print_red(f"Error reading instruction file {instruction_file}: {e}")
+            print_red(f"Error reading instruction file {instruction_file}: {e}", self)
             if self.args.instruction:
-                print_red("Please provide a valid instruction file using the -i parameter.")
+                print_red("Please provide a valid instruction file using the -i parameter.", self)
             else:
-                print_red(f"The default instruction file {instruction_file} was not found.")
-                print_red("Please create this file or specify a different file using the -i parameter.")
+                print_red(f"The default instruction file {instruction_file} was not found.", self)
+                print_red("Please create this file or specify a different file using the -i parameter.", self)
             sys.exit(1)
 
     def save_response_to_file(self):
         """Save the response to the specified file if provided."""
         if not self.response:
-            print_yellow("No response to save.")
+            print_yellow("No response to save.", self)
             return
 
         # Only save if an output file is explicitly specified
         output_file = self.args.output
         if not output_file:
-            print_green("No output file specified, response will not be saved to a file.")
+            print_green("No output file specified, response will not be saved to a file.", self)
             return
 
         # Write the response to the specified file
@@ -506,11 +506,11 @@ class AiderReview:
             # Write the response to the file
             with open(output_file, "w") as f:
                 f.write(self.response)
-            print_green(f"Response has been written to {output_file}")
+            print_green(f"Response has been written to {output_file}", self)
         except IOError as e:
-            print_red(f"Error writing to file {output_file}: {e}")
+            print_red(f"Error writing to file {output_file}: {e}", self)
         except Exception as e:
-            print_red(f"Unexpected error creating output file {output_file}: {e}")
+            print_red(f"Unexpected error creating output file {output_file}: {e}", self)
 
     def confirm_with_user(self):
         """
@@ -533,17 +533,17 @@ class AiderReview:
         """Execute the instruction and save the response to a file."""
         # Show token usage and ask for confirmation
         self.coder.run("/tokens")
-        print_green("Token usage information is displayed above. Please review the cost before proceeding.")
+        print_green("Token usage information is displayed above. Please review the cost before proceeding.", self)
 
         # Check if we should skip confirmation
         if self.args.yes:
-            print_green("Skipping confirmation due to --yes flag.")
+            print_green("Skipping confirmation due to --yes flag.", self)
             proceed = True
         else:
             proceed = self.confirm_with_user()
 
         if not proceed:
-            print_yellow("Operation cancelled by user.")
+            print_yellow("Operation cancelled by user.", self)
             return
 
         # Execute the instruction
