@@ -155,6 +155,8 @@ class ReviewConfig:
             # Required Aider fields
             required_aider_fields = [
                 'generic_instruction_file',
+                'style_check_instruction_file',
+                'static_analysis_instruction_file',
                 'api_keys',
                 'models',
                 'model_metadata_file',
@@ -170,6 +172,8 @@ class ReviewConfig:
 
             # Basic Aider settings
             self.aider_generic_instruction_file = aider_config['generic_instruction_file']
+            self.aider_style_check_instruction_file = aider_config['style_check_instruction_file']
+            self.aider_static_analysis_instruction_file = aider_config['static_analysis_instruction_file']
             self.aider_model_metadata_file = aider_config['model_metadata_file']
             self.aider_max_tokens = aider_config['max_tokens']
             self.aider_map_tokens = aider_config.get('map_tokens', 1024)  # Default to 1024 if not specified

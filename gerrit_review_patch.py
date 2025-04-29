@@ -248,6 +248,9 @@ class GerritReviewer:
         # If skip_gerrit_review is True, don't post the review to Gerrit
         if skip_gerrit_review:
             return True
+        
+        ai_header = "[Gerrit AI Reviewer] The following AI-generated review provides a summary, visualization, guidance for reviewing. \n\n"
+        review_comment = ai_header + review_comment
 
         # Post the review comment back to Gerrit
         return self.post_review(change, review_comment)

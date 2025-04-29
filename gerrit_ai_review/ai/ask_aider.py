@@ -20,6 +20,8 @@ from aider.repo import GitRepo
 # Import common utilities and configuration
 from gerrit_ai_review.utils.review_common import ReviewConfig, print_green, print_yellow, print_red
 
+GIT_SHOW_IGNORE="':!*wiretest*' ':!*wirecheck*'"
+
 class AiderReview:
     """
     A class that encapsulates the functionality for reviewing Lustre code commits
@@ -246,7 +248,7 @@ class AiderReview:
 
         return True, output
 
-    def add_git_show_to_context(self, commit_hash="HEAD", use_func_context=False):
+    def add_git_show_to_context(self, use_func_context=False):
         """
         Add the output of git show for a specific commit to the chat context.
 
@@ -256,15 +258,17 @@ class AiderReview:
         Returns:
             bool: True if successful, False otherwise
         """
-        git_args = ""
-
         if use_func_context:
-            git_args += "--function-context"
+            success, _ = self.add_command_output_to_context(
+                f"git --no-pager show --function-context -- . {GIT_SHOW_IGNORE}",
+                assistant_response="I'll analyze this commit in my response."
+            )
+        else:
+            success, _ = self.add_command_output_to_context(
+                f"git --no-pager show -- .",
+                assistant_response="I'll analyze this commit in my response."
+            )
 
-        success, _ = self.add_command_output_to_context(
-            f"git --no-pager {git_args} show {commit_hash}",
-            assistant_response="I'll analyze this commit in my response."
-        )
         return success
 
     def check_and_manage_token_usage(self, max_tokens=200000, added_files=None):
@@ -602,7 +606,7 @@ class AiderReview:
         self.add_ro_refs_to_context(self.config.aider_common_ai_refs)
 
         # Add git show output to context
-        self.add_git_show_to_context()    
+        self.add_git_show_to_context()
 
         # Add the most changed files to context
         # The max_files value is already set in the constructor with fallback to config
@@ -622,20 +626,45 @@ class AiderReview:
         return response
 
     def run_style_check(self):
-        # Set up the environment
+        """Run a style check on the current commit."""
+        # Set up the environment if needed
         if self.coder is None:
             self.setup_environment()
         else:
             self.coder.run("/reset")
 
-        self.env_stats()
+        # Try with function context first, then without if needed
+        for use_func_context in [True, False]:
+            # Reset context for each attempt
+            self.coder.run("/reset")
+            self.env_stats()
 
-        self.add_ro_refs_to_context(self.config.aider_style_check_ai_refs)
+            # Add references to context
+            self.add_ro_refs_to_context(self.config.aider_style_check_ai_refs)
 
-        # Add git show output to context
-        self.add_git_show_to_context(use_func_context=True)
+            # Add git show output to context (with or without function context)
+            self.add_git_show_to_context(use_func_context=use_func_context)
 
-        self.check_and_manage_token_usage(self.args.max_tokens)
+            # Check token usage
+            enough_tokens = self.check_and_manage_token_usage(self.args.max_tokens)
+
+            if enough_tokens:
+                # We have enough tokens, proceed with the review
+                break
+
+            if use_func_context:
+                # First attempt failed, will try again with reduced context
+                print_yellow("Not enough tokens with full context. Trying again with reduced context...", self)
+            else:
+                # Both attempts failed
+                print_yellow("Still not enough tokens even with reduced context. Exiting.", self)
+                return
+
+        # Read the instruction and execute it
+        instruction = self.read_instruction(self.config.aider_style_check_instruction_file)
+        response = self.execute_instruction(instruction)
+
+        return response
 
     def run_static_analysis(self):
         if self.coder is None:
@@ -651,3 +680,9 @@ class AiderReview:
         self.add_git_show_to_context(use_func_context=True)
 
         self.check_and_manage_token_usage(self.args.max_tokens)
+
+        instruction = self.read_instruction(self.config.aider_static_analysis_instruction_file)
+
+        response = self.execute_instruction(instruction)
+
+        return response

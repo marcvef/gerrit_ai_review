@@ -88,6 +88,8 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
     if backend == "aider":
         # Create an AiderReview instance with the args and config file
         bot = AiderReview(args=args, config_file=config_file)
+        # return bot.run_style_check()
+        # response = bot.run_generic()
         return bot.run_generic()
     elif backend == "augment":
         # Create an AugmentReview instance with the args and config file
