@@ -1,6 +1,6 @@
-# Gerrit AI Review
+# Gerrit AI Review for Lustre
 
-A tool for AI-assisted code review of Gerrit patches.
+A tool for AI-assisted code review of Gerrit Lustre patches.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -26,6 +26,7 @@ cd gerrit_ai_review
 # setup Python virtual environment with Python 3.12, install dependencies, and apply patches
 ./install.sh 
 
+# if python cannot be found, deactivate, and source venv/bin/activate again
 # Edit config/config.yaml to add your API keys and customize settings
 
 # Optional: Clone your Lustre codebase
