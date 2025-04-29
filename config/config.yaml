@@ -14,8 +14,8 @@ aider:
 
   # API keys
   api_keys:
-    free_gemini: "AIzaSyCmFZ5jYbIKYwtdfynby_WaGD7FDouyqvc"
-    paid_gemini: "AIzaSyDwPO_2pjenfvJXLH29-1XkrWjOLanV52I"
+    free_gemini: "XXX"
+    paid_gemini: "XXX"
 
   # Model settings
   models:
@@ -46,5 +46,5 @@ gerrit:
 
   # Authentication settings
   auth:
-    username: "mvef"
-    password: "fYWCNvCHgYIOw4Vzy70/hK8R6myWIUGoif/3enkIOQ"
+    username: "XXX"
+    password: "XXX"

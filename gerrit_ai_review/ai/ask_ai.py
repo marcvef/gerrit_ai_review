@@ -23,6 +23,8 @@ def parse_arguments():
                        help="Output file to write the response to")
     parser.add_argument("-i", "--instruction", type=str,
                        help="File containing the instruction for the AI")
+    parser.add_argument("-c", "--config", type=str,
+                       help="Path to configuration file")
 
     # Backend selection
     backend_group = parser.add_mutually_exclusive_group()
@@ -48,7 +50,7 @@ def parse_arguments():
 
 def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
               instruction_file=None, output_file=None, skip_confirmation=False,
-              backend="aider"):
+              backend="aider", config_file=None):
     """
     Run a review programmatically, without command-line arguments.
 
@@ -63,6 +65,7 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
         output_file (str): Path to save the response (if None, response is not saved to a file)
         skip_confirmation (bool): Whether to skip the confirmation prompt
         backend (str): Which backend to use ("aider" or "augment")
+        config_file (str): Path to the configuration file (if None, uses default)
 
     Returns:
         str: The response from the AI model
@@ -82,17 +85,17 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
 
     # Select the appropriate backend
     if backend == "aider":
-        # Create an AiderReview instance with the args
-        bot = AiderReview(args=args)
+        # Create an AiderReview instance with the args and config file
+        bot = AiderReview(args=args, config_file=config_file)
         return bot.run()
     elif backend == "augment":
-        # Create an AugmentReview instance with the args
-        bot = AugmentReview(args=args)
+        # Create an AugmentReview instance with the args and config file
+        bot = AugmentReview(args=args, config_file=config_file)
         return bot.run()
     else:
         print_red(f"Unknown backend: {backend}")
         print_yellow("Falling back to Aider backend")
-        bot = AiderReview(args=args)
+        bot = AiderReview(args=args, config_file=config_file)
         return bot.run()
 
 def run_manual():
@@ -115,7 +118,8 @@ def run_manual():
         instruction_file=args.instruction,
         output_file=args.output,
         skip_confirmation=args.yes,
-        backend=backend
+        backend=backend,
+        config_file=args.config
     )
 
     # If the response is not being saved to a file, print it

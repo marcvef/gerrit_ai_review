@@ -22,7 +22,7 @@ from gerrit_ai_review.ai.ask_ai import run_review
 def parse_arguments():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Connect to Gerrit and review patches")
-    parser.add_argument("--config", type=str, help="Path to configuration file")
+    parser.add_argument("-c", "--config", type=str, help="Path to configuration file")
     parser.add_argument("--test", action="store_true", help="Test the connection to Gerrit")
     parser.add_argument("-s", "--skip-gerrit-review", action="store_true",
                        help="Run AI review but skip posting the results to Gerrit")
@@ -42,16 +42,18 @@ class GerritReviewer:
     3. Posting review comments back to Gerrit
     """
 
-    def __init__(self, gerrit_client: GerritClient, lustre_dir: str):
+    def __init__(self, gerrit_client: GerritClient, lustre_dir: str, config_file=None):
         """
         Initialize the GerritReviewer.
 
         Args:
             gerrit_client: The GerritClient to use for Gerrit operations
             lustre_dir: The directory of the Lustre git repository
+            config_file: Path to the configuration file
         """
         self.gerrit_client = gerrit_client
         self.lustre_dir = lustre_dir
+        self.config_file = config_file
 
     def checkout_patch(self, change_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -183,7 +185,8 @@ class GerritReviewer:
                 max_files=5,           # Allow more files for Gerrit reviews
                 max_tokens=200000,     # Use the default token limit
                 output_file=None,      # Don't save to a file
-                skip_confirmation=False # Skip confirmation in automated mode
+                skip_confirmation=False, # Skip confirmation in automated mode
+                config_file=self.config_file  # Pass the configuration file
             )
 
             if not review_result:
@@ -272,7 +275,7 @@ def main():
         print_green(f"Getting change: {change_id}")
 
         # Create a GerritReviewer instance
-        reviewer = GerritReviewer(client, config.lustre_dir)
+        reviewer = GerritReviewer(client, config.lustre_dir, args.config)
 
         # Review the patch
         print_green(f"Reviewing patch {change_id}...")
