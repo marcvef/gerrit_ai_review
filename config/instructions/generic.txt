@@ -4,6 +4,6 @@ You should do the following tasks. Please separate them clearly in the output. T
 1. You should provide a summary of the commit
 2. You should provide a textual visualization showing where the changes were made in the context of the Lustre architecture. The visualization should not rely on external tools like Mermaid and directly readable! The architecture should contain the VFS, Lustre client, Lustre server. Highlight WHERE the changes occurred. "lustre_arch.md" in the context gives a reference architecture and feel free to modify it as required, and annotate where the modified files are in the diagram which is the most important.
 3. Critically review the changes and provide useful information for human reviewers to look out for. 
-4. Provide your own critical review of the changes. What are potential weaknesses? What could be further improved?
+4. Provide your own critical review of the changes. What are potential weaknesses? What could be further improved? Does the commit message adequately describe the changes?
 
 For all tasks, be as detailed and specific as possible!
