@@ -16,34 +16,34 @@ from gerrit_ai_review.utils.review_common import print_green, print_yellow, prin
 def parse_arguments():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Run AI-assisted code review with different backends")
-    
+
     # Common arguments for all backends
     parser.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
     parser.add_argument("-o", "--output", type=str,
                        help="Output file to write the response to")
     parser.add_argument("-i", "--instruction", type=str,
                        help="File containing the instruction for the AI")
-    
+
     # Backend selection
     backend_group = parser.add_mutually_exclusive_group()
     backend_group.add_argument("--aider", action="store_true", default=True,
                               help="Use Aider as the backend (default)")
     backend_group.add_argument("--augment", action="store_true",
                               help="Use Augment as the backend")
-    
+
     # Model selection
     model_group = parser.add_mutually_exclusive_group()
     model_group.add_argument("-f", "--free-model", action="store_true",
                             help="Use the free model (default)")
     model_group.add_argument("-p", "--paid-model", action="store_true",
                             help="Use the paid model")
-    
+
     # Other options
     parser.add_argument("--max-files", type=int, default=3,
                        help="Maximum number of most-changed files to add to context (default: 3)")
     parser.add_argument("--max-tokens", type=int, default=200000,
                        help="Maximum number of tokens allowed in context (default: 200,000)")
-    
+
     return parser.parse_args()
 
 def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
@@ -95,10 +95,10 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
         bot = AiderReview(args=args)
         return bot.run()
 
-def main():
-    """Main function to run the appropriate AI backend."""
+def run_manual():
+    """Main function to run the appropriate AI backend via CLI."""
     args = parse_arguments()
-    
+
     # Determine which backend to use
     if args.augment:
         print_green("Using Augment backend")
@@ -106,7 +106,7 @@ def main():
     else:
         print_green("Using Aider backend")
         backend = "aider"
-    
+
     # Run the review with the selected backend
     response = run_review(
         use_paid_model=args.paid_model,
@@ -117,12 +117,9 @@ def main():
         skip_confirmation=args.yes,
         backend=backend
     )
-    
+
     # If the response is not being saved to a file, print it
     if not args.output and response:
         print(response)
-    
-    return response
 
-if __name__ == "__main__":
-    main()
+    return response
