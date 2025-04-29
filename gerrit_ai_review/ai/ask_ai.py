@@ -46,6 +46,8 @@ def parse_arguments():
                        help="Maximum number of most-changed files to add to context (default: 3)")
     parser.add_argument("--max-tokens", type=int, default=200000,
                        help="Maximum number of tokens allowed in context (default: 200,000)")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                       help="Print verbose output, including command results")
 
     # Review type options
     review_type_group = parser.add_argument_group("Review types (if none specified, all will be run)")
@@ -61,7 +63,7 @@ def parse_arguments():
 def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
               instruction_file=None, output_file=None, skip_confirmation=False,
               backend="aider", config_file=None, generic_review=True, style_review=False,
-              static_analysis_review=False):
+              static_analysis_review=False, verbose=False):
     """
     Run a review programmatically, without command-line arguments.
 
@@ -80,6 +82,7 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
         generic_review (bool): Whether to run the generic review
         style_review (bool): Whether to run the style check review
         static_analysis_review (bool): Whether to run the static analysis review
+        verbose (bool): Whether to print verbose output, including command results
 
     Returns:
         list: A list of responses from the AI model. May be empty if no reviews were generated.
@@ -96,6 +99,7 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
     args.instruction = instruction_file
     args.output = output_file
     args.yes = skip_confirmation
+    args.verbose = verbose
 
     # AI headers for each review type
     generic_header = "[Gerrit AI Reviewer - Generic Review] This is an AI review and provides a patch summary, visualization, guidance for reviewing. Note that this review is neither necessarily complete nor correct! \n\n"
@@ -186,5 +190,6 @@ def run_manual():
         config_file=args.config,
         generic_review=args.generic_review,
         style_review=args.style_review,
-        static_analysis_review=args.static_analysis_review
+        static_analysis_review=args.static_analysis_review,
+        verbose=args.verbose
     )

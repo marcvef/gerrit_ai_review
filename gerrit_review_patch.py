@@ -28,6 +28,8 @@ def parse_arguments():
                        help="Run AI review but skip posting the results to Gerrit")
     parser.add_argument("--yes", action="store_true",
                        help="Skip confirmation prompts")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                       help="Print verbose output, including command results")
 
     # Review type options
     review_type_group = parser.add_argument_group("Review types (if none specified, all will be run)")
@@ -164,7 +166,7 @@ class GerritReviewer:
             os.chdir(original_dir)
 
     def run_review_bot(self, change: Dict[str, Any], generic_review=True, style_review=False,
-                   static_analysis_review=False, skip_confirmation=False) -> Optional[list]:
+                   static_analysis_review=False, skip_confirmation=False, verbose=False) -> Optional[list]:
         """
         Run AiderReview on a checked out patch.
 
@@ -174,6 +176,7 @@ class GerritReviewer:
             style_review: Whether to run the style check review
             static_analysis_review: Whether to run the static analysis review
             skip_confirmation: Whether to skip confirmation prompts
+            verbose: Whether to print verbose output, including command results
 
         Returns:
             A list of review comments if successful, None otherwise
@@ -220,7 +223,8 @@ class GerritReviewer:
                 backend="aider",      # Explicitly specify the backend to use
                 generic_review=generic_review,
                 style_review=style_review,
-                static_analysis_review=static_analysis_review
+                static_analysis_review=static_analysis_review,
+                verbose=verbose       # Pass the verbose flag
             )
 
             if review_result is None:
@@ -261,7 +265,7 @@ class GerritReviewer:
     def review_patch(self, change_id: str, skip_gerrit_review: bool = False,
                    generic_review: bool = True, style_review: bool = False,
                    static_analysis_review: bool = False, skip_confirmation: bool = False,
-                   patch_version: str = None) -> bool:
+                   patch_version: str = None, verbose: bool = False) -> bool:
         """
         Review a patch from Gerrit.
 
@@ -278,6 +282,7 @@ class GerritReviewer:
             static_analysis_review: Whether to run the static analysis review
             skip_confirmation: Whether to skip confirmation prompts
             patch_version: The specific patch version to checkout (if None, uses the latest)
+            verbose: Whether to print verbose output, including command results
 
         Returns:
             True if successful, False otherwise
@@ -303,7 +308,8 @@ class GerritReviewer:
             generic_review=generic_review,
             style_review=style_review,
             static_analysis_review=static_analysis_review,
-            skip_confirmation=skip_confirmation
+            skip_confirmation=skip_confirmation,
+            verbose=verbose
         )
 
         if not review_comments:
@@ -361,7 +367,8 @@ def main():
             style_review=args.style_review,
             static_analysis_review=args.static_analysis_review,
             skip_confirmation=args.yes,
-            patch_version=patch_version
+            patch_version=patch_version,
+            verbose=args.verbose
         )
 
         if success:

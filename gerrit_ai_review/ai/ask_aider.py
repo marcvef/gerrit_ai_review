@@ -14,7 +14,6 @@ import io
 import re
 from aider.coders import Coder
 from aider.models import Model
-from aider.run_cmd import run_cmd
 from aider.repo import GitRepo
 
 # Import common utilities and configuration
@@ -208,7 +207,6 @@ class AiderReview:
     def env_stats(self):
         # Print information about the working directory
         print_green(f"Working with Lustre repository at: {self.coder.root}", self)
-        print_green(f"Files in chat context: {', '.join(self.coder.get_inchat_relative_files())}", self)
         print_green(f"Using {self.config.aider_map_tokens} tokens for repository map", self)
 
     def add_command_output_to_context(self, command, add_to_context=True,
@@ -226,8 +224,16 @@ class AiderReview:
                   and output is the command's output as a string
         """
         print_green(f"Running command: {command}", self)
-        # Use the repository's root directory for command execution
-        _, output = run_cmd(command, cwd=self.coder.root)
+
+        # Check if verbose mode is enabled
+        if self.args.verbose:
+            # Use the regular run_cmd function to print output to the shell
+            from aider.run_cmd import run_cmd
+            _, output = run_cmd(command, cwd=self.coder.root)
+        else:
+            # Use our silent version of run_cmd to prevent output from being printed to the shell
+            from gerrit_ai_review.utils.run_cmd_silent import run_cmd as run_cmd_silent
+            _, output = run_cmd_silent(command, cwd=self.coder.root, silent=True)
 
         if not output:
             print_yellow("Command produced no output", self)
@@ -424,7 +430,16 @@ class AiderReview:
 
         # Get the list of files changed in the commit with their stats
         cmd = f"git --no-pager diff --numstat {commit_hash}^ {commit_hash}"
-        _, output = run_cmd(cmd, cwd=self.coder.root)
+
+        # Check if verbose mode is enabled
+        if self.args.verbose:
+            # Use the regular run_cmd function to print output to the shell
+            from aider.run_cmd import run_cmd
+            _, output = run_cmd(cmd, cwd=self.coder.root)
+        else:
+            # Use our silent version of run_cmd to prevent output from being printed to the shell
+            from gerrit_ai_review.utils.run_cmd_silent import run_cmd as run_cmd_silent
+            _, output = run_cmd_silent(cmd, cwd=self.coder.root, silent=True)
 
         if not output:
             print_yellow(f"No changes found in commit {commit_hash}", self)
