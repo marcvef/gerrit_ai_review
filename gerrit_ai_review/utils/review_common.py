@@ -88,6 +88,7 @@ class ReviewConfig:
         self.models = None
         self.model_metadata_file = None
         self.max_tokens = None
+        self.map_tokens = None
         self.ignored_dirs = None
 
         # Initialize Gerrit configuration attributes
@@ -149,6 +150,7 @@ class ReviewConfig:
             self.default_instruction_file = config['default_instruction_file']
             self.model_metadata_file = config['model_metadata_file']
             self.max_tokens = config['max_tokens']
+            self.map_tokens = config.get('map_tokens', 1024)  # Default to 1024 if not specified
 
             # List attributes
             self.common_ai_refs = config.get('common_ai_refs', [])

@@ -171,7 +171,8 @@ class AiderReview:
         repo = GitRepo(io=None, fnames=[], git_dname=self.config.lustre_dir)
 
         # Create a coder object with the specified repository
-        self.coder = Coder.create(main_model=model, fnames=[], repo=repo)
+        # Use map_tokens from config to control token usage for the repository map
+        self.coder = Coder.create(main_model=model, fnames=[], repo=repo, map_tokens=self.config.map_tokens)
 
         # Add files to the chat context
         self.add_ro_refs_to_context()
@@ -179,6 +180,7 @@ class AiderReview:
         # Print information about the working directory
         print_green(f"Working with Lustre repository at: {self.coder.root}", self)
         print_green(f"Files in chat context: {', '.join(self.coder.get_inchat_relative_files())}", self)
+        print_green(f"Using {self.config.map_tokens} tokens for repository map", self)
 
         # Show initial token usage
         self.coder.run("/tokens")
@@ -444,7 +446,7 @@ class AiderReview:
             # Aider's /add command will handle the path resolution
             try:
                 print_green(f"Attempting to add {filename} to context...", self)
-                
+
                 # Use the file path as reported by git
                 self.coder.run(f"/add {filename}")
                 added_files.append((filename, changes))
@@ -567,6 +569,7 @@ class AiderReview:
         added_files = self.add_most_changed_files_to_context(max_files=self.args.max_files)
 
         # Check token usage and remove files if it exceeds the threshold
+        # Note: We're using the configured map_tokens value for the repository map, but still respecting max_tokens for overall context
         self.check_and_manage_token_usage(self.args.max_tokens, added_files)
 
         # Read the instruction from file

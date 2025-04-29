@@ -25,6 +25,7 @@ model_metadata_file: "config/model-metadata.json"
 
 # Token limits
 max_tokens: 200000
+map_tokens: 8192
 
 # Directories to ignore when adding files to context
 ignored_dirs:
