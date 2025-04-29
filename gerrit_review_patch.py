@@ -26,6 +26,18 @@ def parse_arguments():
     parser.add_argument("--test", action="store_true", help="Test the connection to Gerrit")
     parser.add_argument("-s", "--skip-gerrit-review", action="store_true",
                        help="Run AI review but skip posting the results to Gerrit")
+    parser.add_argument("--yes", action="store_true",
+                       help="Skip confirmation prompts")
+
+    # Review type options
+    review_type_group = parser.add_argument_group("Review types (if none specified, all will be run)")
+    review_type_group.add_argument("--generic-review", action="store_true", default=False,
+                                  help="Run generic review")
+    review_type_group.add_argument("--style-review", action="store_true", default=False,
+                                  help="Run style check review")
+    review_type_group.add_argument("--static-analysis-review", action="store_true", default=False,
+                                  help="Run static analysis review")
+
     parser.add_argument("change_id", type=str, nargs='?',
                        help="Change ID, number, or Gerrit URL to retrieve and review")
 
@@ -150,15 +162,20 @@ class GerritReviewer:
             # Return to the original directory
             os.chdir(original_dir)
 
-    def run_review_bot(self, change: Dict[str, Any]) -> Optional[str]:
+    def run_review_bot(self, change: Dict[str, Any], generic_review=True, style_review=False,
+                   static_analysis_review=False, skip_confirmation=False) -> Optional[list]:
         """
         Run AiderReview on a checked out patch.
 
         Args:
             change: The change details
+            generic_review: Whether to run the generic review
+            style_review: Whether to run the style check review
+            static_analysis_review: Whether to run the static analysis review
+            skip_confirmation: Whether to skip confirmation prompts
 
         Returns:
-            The review comment if successful, None otherwise
+            A list of review comments if successful, None otherwise
         """
         print_green("Running AiderReview on the patch...", self)
 
@@ -178,6 +195,16 @@ class GerritReviewer:
             # Get the change number for logging
             change_number = change.get('_number', 'unknown')
 
+            # Check if any specific review types were requested
+            any_review_requested = generic_review or style_review or static_analysis_review
+
+            # If no specific review types were requested, enable all of them
+            if not any_review_requested:
+                generic_review = True
+                style_review = True
+                static_analysis_review = True
+                print_green("No specific review types requested. Running all review types.", self)
+
             # Run the review
             print_green(f"Running review for change {change_number}...", self)
             # The configuration file will be passed to AiderReview, which will handle
@@ -187,18 +214,29 @@ class GerritReviewer:
                 max_files=None,       # Let AiderReview use the configured value
                 max_tokens=None,      # Let AiderReview use the configured value
                 output_file=None,     # Don't save to a file
-                skip_confirmation=False, # Skip confirmation in automated mode
+                skip_confirmation=skip_confirmation, # Skip confirmation if requested
                 config_file=self.config_file,  # Pass the configuration file
-                backend="aider"       # Explicitly specify the backend to use
+                backend="aider",      # Explicitly specify the backend to use
+                generic_review=generic_review,
+                style_review=style_review,
+                static_analysis_review=static_analysis_review
             )
 
             if review_result is None:
-                print_red("AiderReview did not produce a review", self)
+                print_red("AiderReview did not produce any reviews", self)
                 return None
 
-            print_green("Review completed successfully", self)
+            # Ensure we have a list of responses
+            if not isinstance(review_result, list):
+                review_result = [review_result]
 
-            # Return the review result
+            if not review_result:  # Check if the list is empty
+                print_red("AiderReview produced an empty list of reviews", self)
+                return None
+
+            print_green(f"Review completed successfully with {len(review_result)} responses", self)
+
+            # Return the review result (list of responses)
             return review_result
 
         except Exception as e:
@@ -219,18 +257,24 @@ class GerritReviewer:
         print_green(f"Posting review comment to change {change.get('_number')}...", self)
         return self.gerrit_client.post_review(change, review_comment)
 
-    def review_patch(self, change_id: str, skip_gerrit_review: bool = False) -> bool:
+    def review_patch(self, change_id: str, skip_gerrit_review: bool = False,
+                   generic_review: bool = True, style_review: bool = False,
+                   static_analysis_review: bool = False, skip_confirmation: bool = False) -> bool:
         """
         Review a patch from Gerrit.
 
         This method:
         1. Checks out the patch
         2. Runs AiderReview on it
-        3. Posts the review comment back to Gerrit (unless skip_gerrit_review is True)
+        3. Posts the review comments back to Gerrit (unless skip_gerrit_review is True)
 
         Args:
             change_id: The ID of the change to review
             skip_gerrit_review: If True, skip posting the review to Gerrit
+            generic_review: Whether to run the generic review
+            style_review: Whether to run the style check review
+            static_analysis_review: Whether to run the static analysis review
+            skip_confirmation: Whether to skip confirmation prompts
 
         Returns:
             True if successful, False otherwise
@@ -240,20 +284,42 @@ class GerritReviewer:
         if not change:
             return False
 
-        # Run AiderReview on the patch
-        review_comment = self.run_review_bot(change)
-        if not review_comment:
+        # Check if any specific review types were requested
+        any_review_requested = generic_review or style_review or static_analysis_review
+
+        # If no specific review types were requested, enable all of them
+        if not any_review_requested:
+            generic_review = True
+            style_review = True
+            static_analysis_review = True
+            print_green("No specific review types requested. Running all review types.", self)
+
+        # Run AiderReview on the patch with the specified review types
+        review_comments = self.run_review_bot(
+            change,
+            generic_review=generic_review,
+            style_review=style_review,
+            static_analysis_review=static_analysis_review,
+            skip_confirmation=skip_confirmation
+        )
+
+        if not review_comments:
             return False
 
         # If skip_gerrit_review is True, don't post the review to Gerrit
         if skip_gerrit_review:
             return True
-        
-        ai_header = "[Gerrit AI Reviewer] The following AI-generated review provides a summary, visualization, guidance for reviewing. \n\n"
-        review_comment = ai_header + review_comment
 
-        # Post the review comment back to Gerrit
-        return self.post_review(change, review_comment)
+        # Ensure we have a list of responses to process
+        if not isinstance(review_comments, list):
+            review_comments = [review_comments]
+
+        # Post each review comment separately
+        success = True
+        for review_comment in review_comments:
+            if not self.post_review(change, review_comment):
+                success = False
+        return success
 
 
 def main():
@@ -285,7 +351,14 @@ def main():
 
         # Review the patch
         print_green(f"Reviewing patch {change_id}...")
-        success = reviewer.review_patch(change_id, args.skip_gerrit_review)
+        success = reviewer.review_patch(
+            change_id,
+            args.skip_gerrit_review,
+            generic_review=args.generic_review,
+            style_review=args.style_review,
+            static_analysis_review=args.static_analysis_review,
+            skip_confirmation=args.yes
+        )
 
         if success:
             if args.skip_gerrit_review:

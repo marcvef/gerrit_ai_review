@@ -47,11 +47,21 @@ def parse_arguments():
     parser.add_argument("--max-tokens", type=int, default=200000,
                        help="Maximum number of tokens allowed in context (default: 200,000)")
 
+    # Review type options
+    review_type_group = parser.add_argument_group("Review types (if none specified, all will be run)")
+    review_type_group.add_argument("--generic-review", action="store_true", default=False,
+                                  help="Run generic review")
+    review_type_group.add_argument("--style-review", action="store_true", default=False,
+                                  help="Run style check review")
+    review_type_group.add_argument("--static-analysis-review", action="store_true", default=False,
+                                  help="Run static analysis review")
+
     return parser.parse_args()
 
 def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
               instruction_file=None, output_file=None, skip_confirmation=False,
-              backend="aider", config_file=None):
+              backend="aider", config_file=None, generic_review=True, style_review=False,
+              static_analysis_review=False):
     """
     Run a review programmatically, without command-line arguments.
 
@@ -67,9 +77,12 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
         skip_confirmation (bool): Whether to skip the confirmation prompt
         backend (str): Which backend to use ("aider" or "augment")
         config_file (str): Path to the configuration file (if None, uses default)
+        generic_review (bool): Whether to run the generic review
+        style_review (bool): Whether to run the style check review
+        static_analysis_review (bool): Whether to run the static analysis review
 
     Returns:
-        str: The response from the AI model
+        list: A list of responses from the AI model. May be empty if no reviews were generated.
     """
     # Create a simple object to mimic the args namespace
     class Args:
@@ -84,22 +97,70 @@ def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
     args.output = output_file
     args.yes = skip_confirmation
 
+    # AI headers for each review type
+    generic_header = "[Gerrit AI Reviewer - Generic Review] This is an AI review and provides a patch summary, visualization, guidance for reviewing. Note that this review is neither necessarily complete nor correct! \n\n"
+    style_header = "[Gerrit AI Reviewer - Code Style Review] This is an AI style review and shows potential stylistic issues. Note that this review is neither necessarily complete nor correct! \n\n"
+    static_analysis_header = "[Gerrit AI Reviewer - Static Analysis Review] This is an AI static-analysis review and shows potential issues. Note that this review is neither necessarily complete nor correct! \n\n"
+
     # Select the appropriate backend
     if backend == "aider":
         # Create an AiderReview instance with the args and config file
         bot = AiderReview(args=args, config_file=config_file)
-        # return bot.run_static_analysis()
-        # return bot.run_style_check()
-        # response = bot.run_generic()
-        return bot.run_generic()
+
+        # Initialize responses list
+        responses = []
+
+        # Check if any specific review types were requested
+        any_review_requested = generic_review or style_review or static_analysis_review
+
+        # If no specific review types were requested, enable all of them
+        if not any_review_requested:
+            generic_review = True
+            style_review = True
+            static_analysis_review = True
+            print_green("No specific review types requested. Running all review types.")
+
+        # Run generic review if requested (first)
+        if generic_review:
+            print_green("Running generic review...")
+            generic_response = bot.run_generic()
+            if generic_response:
+                responses.append(generic_header + generic_response)
+
+        # Run style check if requested (second)
+        if style_review:
+            print_green("Running style check review...")
+            style_check_response = bot.run_style_check()
+            if style_check_response:
+                responses.append(style_header + style_check_response)
+
+        # Run static analysis if requested (third)
+        if static_analysis_review:
+            print_green("Running static analysis review...")
+            static_analysis_response = bot.run_static_analysis()
+            if static_analysis_response:
+                responses.append(static_analysis_header + static_analysis_response)
+
+        # Always return a list, even if it contains only one item or is empty
+        return responses
     elif backend == "augment":
         # Create an AugmentReview instance with the args and config file
         bot = AugmentReview(args=args, config_file=config_file)
-        return bot.run()
+        response = bot.run()
+
+        # Initialize responses list
+        responses = []
+
+        if response:
+            # Use the generic header for Augment reviews
+            responses.append(generic_header + response)
+
+        # Always return a list, even if it's empty
+        return responses
     else:
         print_red(f"Unknown backend: {backend}")
         print_red("Error: Invalid backend specified. Please use 'aider' or 'augment'.")
-        return None
+        return []  # Return an empty list for consistency
 
 def run_manual():
     """Main function to run the appropriate AI backend via CLI."""
@@ -122,5 +183,8 @@ def run_manual():
         output_file=args.output,
         skip_confirmation=args.yes,
         backend=backend,
-        config_file=args.config
+        config_file=args.config,
+        generic_review=args.generic_review,
+        style_review=args.style_review,
+        static_analysis_review=args.static_analysis_review
     )
