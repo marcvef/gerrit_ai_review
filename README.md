@@ -146,7 +146,7 @@ lustre_dir: "/path/to/lustre/repo"
 
 # Aider configuration
 aider:
-  # Default instruction file
+  # Default instruction file. Use either instructions or instructions_short. Feel free to modify the instructions.
   generic_instruction_file: "config/instructions/generic.txt"
   style_check_instruction_file: "config/instructions/style_check.txt"
   static_analysis_instruction_file: "config/instructions/static_analysis.txt"
