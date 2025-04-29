@@ -524,7 +524,6 @@ class AiderReview:
         # Only save if an output file is explicitly specified
         output_file = self.args.output
         if not output_file:
-            print_green("No output file specified, response will not be saved to a file.", self)
             return
 
         # Write the response to the specified file
@@ -634,7 +633,7 @@ class AiderReview:
             self.coder.run("/reset")
 
         # Try with function context first, then without if needed
-        for use_func_context in [True, False]:
+        for use_func_context in [False, False]:
             # Reset context for each attempt
             self.coder.run("/reset")
             self.env_stats()
@@ -662,27 +661,42 @@ class AiderReview:
 
         # Read the instruction and execute it
         instruction = self.read_instruction(self.config.aider_style_check_instruction_file)
-        response = self.execute_instruction(instruction)
-
-        return response
+        return self.execute_instruction(instruction)
 
     def run_static_analysis(self):
+
+        # Set up the environment if needed
         if self.coder is None:
             self.setup_environment()
         else:
             self.coder.run("/reset")
 
-        self.env_stats()
+        # Try with function context first, then without if needed
+        for use_func_context in [True, False]:
+            # Reset context for each attempt
+            self.coder.run("/reset")
+            self.env_stats()
 
-        self.add_ro_refs_to_context(self.config.aider_static_analysis_ai_refs)
+            # Add references to context
+            self.add_ro_refs_to_context(self.config.aider_static_analysis_ai_refs)
 
-        # Add git show output to context
-        self.add_git_show_to_context(use_func_context=True)
+            # Add git show output to context (with or without function context)
+            self.add_git_show_to_context(use_func_context=use_func_context)
 
-        self.check_and_manage_token_usage(self.args.max_tokens)
+            # Check token usage
+            enough_tokens = self.check_and_manage_token_usage(self.args.max_tokens)
+
+            if enough_tokens:
+                # We have enough tokens, proceed with the review
+                break
+
+            if use_func_context:
+                # First attempt failed, will try again with reduced context
+                print_yellow("Not enough tokens with full context. Trying again with reduced context...", self)
+            else:
+                # Both attempts failed
+                print_yellow("Still not enough tokens even with reduced context. Exiting.", self)
+                return
 
         instruction = self.read_instruction(self.config.aider_static_analysis_instruction_file)
-
-        response = self.execute_instruction(instruction)
-
-        return response
+        return self.execute_instruction(instruction)
