@@ -16,8 +16,8 @@ from gerrit_ai_review.utils.review_common import ReviewConfig, print_green, prin
 # Import Gerrit client
 from gerrit_ai_review.gerrit.client import GerritClient
 
-# Import the run_review function from ask_aider.py
-from gerrit_ai_review.review_bot.ask_aider import run_review
+# Import the run_review function from ask_ai.py
+from gerrit_ai_review.ai.ask_ai import run_review
 
 def parse_arguments():
     """Parse command-line arguments."""

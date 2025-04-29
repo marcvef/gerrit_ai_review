@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ReviewBot - Lustre Code Review Assistant
+AiderReview - Lustre Code Review Assistant
 
 This script provides a class-based implementation of a code review assistant
 that uses Aider to analyze git commits in the Lustre codebase and generate
@@ -9,9 +9,7 @@ detailed reviews.
 
 import os
 import sys
-import argparse
 import pathlib
-import yaml
 import io
 import re
 from aider.coders import Coder
@@ -33,14 +31,19 @@ class AiderReview:
         Initialize the AiderReview with command line arguments and configuration.
 
         Args:
-            args: Command line arguments (if None, they will be parsed)
+            args: Command line arguments (required)
             config_file: Path to configuration file (if None, uses default)
         """
         # Load configuration
         self.config = ReviewConfig(config_file)
 
-        # Parse arguments
-        self.args = args if args is not None else self.parse_arguments()
+        # Validate and set arguments
+        if args is None:
+            raise ValueError("Arguments must be provided to AiderReview")
+
+        # Validate required arguments
+        self._validate_args(args)
+        self.args = args
 
         # Initialize other attributes
         self.coder = None
@@ -50,29 +53,29 @@ class AiderReview:
         # Register model metadata
         self.register_model_metadata()
 
-    def parse_arguments(self):
-        """Parse command-line arguments."""
-        default_instruction = self.config.default_instruction_file
+    def _validate_args(self, args):
+        """
+        Validate that the args object has all required attributes.
 
-        parser = argparse.ArgumentParser(description="Run Aider with the Lustre project")
-        parser.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
-        parser.add_argument("-o", "--output", type=str,
-                           help="Output file to write the response to (if not specified, response will not be saved to a file)")
-        parser.add_argument("-i", "--instruction", type=str,
-                           help=f"File containing the instruction for Aider (default: {default_instruction})")
-        parser.add_argument("--max-files", type=int, default=3,
-                           help="Maximum number of most-changed files to add to context (default: 3)")
-        parser.add_argument("--max-tokens", type=int, default=self.config.max_tokens,
-                           help=f"Maximum number of tokens allowed in context (default: {self.config.max_tokens:,})")
+        Args:
+            args: The arguments object to validate
 
-        # Add model selection arguments in a mutually exclusive group
-        model_group = parser.add_mutually_exclusive_group()
-        model_group.add_argument("-f", "--free-model", action="store_true",
-                                help="Use the free model (default)")
-        model_group.add_argument("-p", "--paid-model", action="store_true",
-                                help="Use the paid model")
+        Raises:
+            ValueError: If any required argument is missing
+        """
+        required_attrs = [
+            'yes',           # Skip confirmation prompt
+            'output',        # Output file path
+            'instruction',   # Instruction file path
+            'max_files',     # Maximum number of files to add
+            'max_tokens',    # Maximum number of tokens allowed
+            'paid_model',    # Whether to use the paid model
+            'free_model'     # Whether to use the free model
+        ]
 
-        return parser.parse_args()
+        missing_attrs = [attr for attr in required_attrs if not hasattr(args, attr)]
+        if missing_attrs:
+            raise ValueError(f"Missing required arguments: {', '.join(missing_attrs)}")
 
     def register_model_metadata(self):
         """Register model metadata from a file to set token limits."""
@@ -575,50 +578,4 @@ class AiderReview:
         return self.response
 
 
-def main():
-    """Main function to run the AiderReview."""
-    bot = AiderReview()
-    bot.run()
 
-
-def run_review(use_paid_model=False, max_files=3, max_tokens=200000,
-              instruction_file=None, output_file=None, skip_confirmation=False):
-    """
-    Run a review programmatically, without command-line arguments.
-
-    This function is designed to be imported and called from other Python modules,
-    such as gerrit_review_patch.py.
-
-    Args:
-        use_paid_model (bool): Whether to use the paid model (True) or free model (False)
-        max_files (int): Maximum number of files to add to context
-        max_tokens (int): Maximum number of tokens allowed in context
-        instruction_file (str): Path to the instruction file (if None, uses default)
-        output_file (str): Path to save the response (if None, response is not saved to a file)
-        skip_confirmation (bool): Whether to skip the confirmation prompt
-
-    Returns:
-        str: The response from the AI model
-    """
-    # Create a simple object to mimic the args namespace
-    class Args:
-        pass
-
-    args = Args()
-    args.paid_model = use_paid_model
-    args.free_model = not use_paid_model
-    args.max_files = max_files
-    args.max_tokens = max_tokens
-    args.instruction = instruction_file
-    args.output = output_file
-    args.yes = skip_confirmation
-
-    # Create an AiderReview instance with the args
-    bot = AiderReview(args=args)
-
-    # Run the review process
-    return bot.run()
-
-
-if __name__ == "__main__":
-    main()
