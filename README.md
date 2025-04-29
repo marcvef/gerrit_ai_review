@@ -12,17 +12,11 @@ A tool for AI-assisted code review of Gerrit patches.
 
 ## Installation
 
-```bash
-pip install -e .
-```
+TODO
 
 ## Usage
 
-```bash
-python gerrit_review_patch.py --test  # Test connection to Gerrit
-python gerrit_review_patch.py <change_id>  # Review a specific change
-python gerrit_review_patch.py <gerrit_url>  # Review a change from URL
-```
+TODO
 
 ## Configuration
 
@@ -48,7 +42,7 @@ aider:
     free_gemini: "your-free-api-key"
     paid_gemini: "your-paid-api-key"
 
-  # Model settings
+  # Model settings (currently only gemini supported)
   models:
     free_model: "gemini-1.0-pro"
     paid_model: "gemini-1.5-pro"
