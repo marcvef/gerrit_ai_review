@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Common utilities and configuration for ReviewBot and GerritReviewer.
+Common utilities and configuration for Review system and GerritReviewer.
 """
 
 import os
@@ -29,9 +29,9 @@ def print_red(message):
     print(f"{RED}* [g ♥ a]{RESET} {message}")
 
 
-class ReviewBotConfig:
+class ReviewConfig:
     """
-    A class that manages configuration for the ReviewBot and Gerrit integration.
+    A class that manages configuration for the Review system and Gerrit integration.
     Loads settings from a YAML file with explicit mapping to class attributes.
     """
 
@@ -45,7 +45,7 @@ class ReviewBotConfig:
         Args:
             config_file: Path to configuration file (if None, uses default)
         """
-        # Initialize ReviewBot configuration attributes
+        # Initialize Review configuration attributes
         self.lustre_dir = None
         self.default_instruction_file = None
         self.common_ai_refs = None

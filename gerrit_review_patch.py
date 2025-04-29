@@ -17,24 +17,24 @@ import yaml
 from typing import Dict, Any, Optional
 
 # Import common utilities and configuration
-from review_common import ReviewBotConfig, print_green, print_yellow, print_red
+from review_common import ReviewConfig, print_green, print_yellow, print_red
 
 # Import the run_review function from ask_aider.py
 from ask_aider import run_review
 
 
-# GerritConfig class has been removed and merged into ReviewBotConfig in review_common.py
+# GerritConfig class has been removed and merged into ReviewConfig in review_common.py
 
 
 class GerritClient:
     """Client for interacting with Gerrit."""
 
-    def __init__(self, config: ReviewBotConfig):
+    def __init__(self, config: ReviewConfig):
         """
         Initialize the Gerrit client.
 
         Args:
-            config: ReviewBot configuration containing Gerrit settings
+            config: Review configuration containing Gerrit settings
         """
         self.config = config
         self.auth = requests.auth.HTTPBasicAuth(config.gerrit_username, config.gerrit_password)
@@ -462,8 +462,8 @@ def main():
     """Main function."""
     args = parse_arguments()
 
-    # Load configuration (now contains both ReviewBot and Gerrit settings)
-    config = ReviewBotConfig(args.config)
+    # Load configuration (now contains both Review and Gerrit settings)
+    config = ReviewConfig(args.config)
 
     # Create Gerrit client
     client = GerritClient(config)

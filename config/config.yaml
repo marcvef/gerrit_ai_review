@@ -1,4 +1,4 @@
-# ReviewBot and Gerrit configuration
+# Review and Gerrit configuration
 
 # Lustre project directory
 lustre_dir: "/Users/mvef/git_wip/lustre-release"

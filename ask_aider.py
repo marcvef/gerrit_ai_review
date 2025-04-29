@@ -20,7 +20,7 @@ from aider.run_cmd import run_cmd
 from aider.repo import GitRepo
 
 # Import common utilities and configuration
-from review_common import ReviewBotConfig, print_green, print_yellow, print_red
+from review_common import ReviewConfig, print_green, print_yellow, print_red
 
 class ReviewBot:
     """
@@ -37,7 +37,7 @@ class ReviewBot:
             config_file: Path to configuration file (if None, uses default)
         """
         # Load configuration
-        self.config = ReviewBotConfig(config_file)
+        self.config = ReviewConfig(config_file)
 
         # Parse arguments
         self.args = args if args is not None else self.parse_arguments()
@@ -464,7 +464,7 @@ class ReviewBot:
         # Determine which instruction file to use
         instruction_file = self.args.instruction
         if not instruction_file:
-            # The default_instruction_file attribute is guaranteed to exist in ReviewBotConfig
+            # The default_instruction_file attribute is guaranteed to exist in ReviewConfig
             instruction_file = self.config.default_instruction_file
 
         # Read the instruction from the file
