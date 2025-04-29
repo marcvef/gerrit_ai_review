@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Setup script for gerrit_ai_review package.
+Setup script for gerrit_ai_review package. TODO
 """
 
 from setuptools import setup, find_packages
