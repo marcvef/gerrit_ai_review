@@ -25,7 +25,7 @@ echo "Applying patches to Aider..."
 
 # Configure the tool
 echo "Creating configuration file..."
-if [[ -f "config/config.yaml" ]]; then
+if [[ ! -e "config/config.yaml" ]]; then
     cp config/config.yaml.example config/config.yaml
     echo "Created config/config.yaml from config/config.yaml.example"
 fi
